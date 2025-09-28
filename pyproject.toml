@@ -1,0 +1,163 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "akash"
+version = "0.1.14"
+description = "Python SDK for Akash Network - interact with the blockchain and deploy and manage workloads on the decentralized cloud"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Akash community", email = "contact@cosmosrescue.com"}
+]
+keywords = [
+    "akash", "blockchain", "kubernetes", "cloud", "decentralized",
+    "deployment", "docker", "grpc", "cosmos", "sdk"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Distributed Computing",
+    "Topic :: System :: Networking",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "grpcio>=1.50.0",
+    "grpclib>=0.4.0",
+    "protobuf>=4.21.0",
+    "googleapis-common-protos>=1.57.0",
+    "ecdsa>=0.18.0",
+    "bech32>=1.2.0",
+    "requests>=2.20.0",
+    "mnemonic>=0.20",
+    "pycryptodome>=3.15.0",
+    "cryptography>=41.0.0",
+    "pyyaml>=5.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov>=2.10",
+    "black>=22.0",
+    "flake8>=4.0",
+    "mypy>=0.900",
+    "build>=0.8.0",
+    "twine>=4.0.0",
+]
+docs = [
+    "sphinx>=4.0",
+    "sphinx-rtd-theme>=1.0",
+    "myst-parser>=0.18",
+]
+
+[project.urls]
+Homepage = "https://github.com/cosmosrescue/akash-py"
+Documentation = "https://akash-py.cosmosrescue.com"
+Repository = "https://github.com/cosmosrescue/akash-py"
+"Bug Tracker" = "https://github.com/cosmosrescue/akash-py/issues"
+"Akash Network" = "https://akash.network/"
+"Akash Docs" = "https://docs.akash.network/"
+
+[project.scripts]
+akash-py = "akash.cli:main"
+
+[tool.setuptools]
+packages = ["akash"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+akash = ["py.typed"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\\.pyi?$'
+extend-exclude = '''
+# A regex preceded by ^/ will apply only to files and directories
+# in the root of the project.
+(
+  gen/        # Generated protobuf files
+  | build/    # Build artifacts
+  | dist/     # Distribution files
+)
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["akash"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "ecdsa.*",
+    "bech32.*",
+    "grpc.*",
+    "google.protobuf.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+    "network: marks tests that require network access",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+[tool.coverage.run]
+source = ["akash"]
+omit = [
+    "*/tests/*",
+    "*/gen/*",
+    "*/examples/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

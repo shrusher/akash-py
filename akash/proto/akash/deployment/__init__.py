@@ -1,0 +1,1 @@
+# Akash deployment protobuf modules
