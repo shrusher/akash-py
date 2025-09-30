@@ -123,17 +123,17 @@ deployment:
       count: 1
 '''
 
-deployment = client.deployment.create_deployment_from_sdl(
-    sdl_content=sdl,
+deployment = client.deployment.create_deployment(
+    sdl_yaml=sdl,
     wallet=wallet,
     deposit="500000"
 )
 
-if not deployment['success']:
-    print(f"Deployment failed: {deployment['error']}")
+if not deployment.success:
+    print(f"Deployment failed: {deployment.raw_log}")
     exit()
 
-dseq = deployment['dseq']
+dseq = deployment.dseq
 print(f"Deployment created: DSEQ {dseq}")
 
 print("Step 3: Waiting for bids...")

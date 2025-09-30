@@ -1646,5 +1646,199 @@ deployment:
         assert "Connection refused" in result["error"] or "failed" in result["error"].lower()
 
 
+class TestManifestVersionCalculation:
+    """Test manifest version calculation for deployment updates."""
+
+    def test_manifest_version_simple_sdl(self):
+        """Test manifest version calculation for simple SDL."""
+        import hashlib
+        import json
+        import base64
+        from akash.modules.manifest.utils import ManifestUtils
+
+        simple_sdl = '''version: "2.0"
+services:
+  nginx:
+    image: nginx:alpine
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+profiles:
+  compute:
+    nginx:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      attributes:
+        host: akash
+      pricing:
+        nginx:
+          denom: uakt
+          amount: 1000
+deployment:
+  nginx:
+    global:
+      profile: nginx
+      count: 1
+'''
+
+        expected_version_hex = "c235e62828ce7f2dbd10d47a6b0bd3a96f699dcff429d23a1a6f91d08d7623c4"
+        expected_version_base64 = "wjXmKCjOfy29ENR6awvTqW9pnc/0KdI6Gm+R0I12I8Q="
+
+        manifest_utils = ManifestUtils()
+        parse_result = manifest_utils.parse_sdl(simple_sdl)
+        assert parse_result.get('status') == 'success'
+
+        manifest_data = parse_result.get('manifest_data', [])
+        legacy_manifest = manifest_utils._create_legacy_manifest(manifest_data)
+        manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+
+        manifest_json = manifest_utils._escape_html(manifest_json)
+
+        version_bytes = hashlib.sha256(manifest_json.encode()).digest()
+        version_base64 = base64.b64encode(version_bytes).decode('utf-8')
+        version_hex = hashlib.sha256(manifest_json.encode()).hexdigest()
+
+        assert version_hex == expected_version_hex
+        assert version_base64 == expected_version_base64
+
+    def test_manifest_version_complex_sdl(self):
+        """Test manifest version calculation for more complex SDL."""
+        import hashlib
+        import json
+        import base64
+        from akash.modules.manifest.utils import ManifestUtils
+
+        complex_sdl = '''version: "2.0"
+services:
+  nginx:
+    image: nginx:alpine
+    command: ["/bin/sh", "-c", "echo 'Updated container' && nginx -g 'daemon off;'"]
+    env:
+      - UPDATE_VERSION=v2
+      - DEPLOYMENT_UPDATE=true
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+profiles:
+  compute:
+    nginx:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      attributes:
+        host: akash
+      pricing:
+        nginx:
+          denom: uakt
+          amount: 1000
+deployment:
+  nginx:
+    global:
+      profile: nginx
+      count: 1
+'''
+
+        expected_version_hex = "0336fbaa72bb20852da56a10adf7f733cbe838884f233f4249599df8be5901bc"
+        expected_version_base64 = "Azb7qnK7IIUtpWoQrff3M8voOIhPIz9CSVmd+L5ZAbw="
+
+        manifest_utils = ManifestUtils()
+        parse_result = manifest_utils.parse_sdl(complex_sdl)
+        assert parse_result.get('status') == 'success'
+
+        manifest_data = parse_result.get('manifest_data', [])
+        legacy_manifest = manifest_utils._create_legacy_manifest(manifest_data)
+        manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+
+        manifest_json = manifest_utils._escape_html(manifest_json)
+
+        version_bytes = hashlib.sha256(manifest_json.encode()).digest()
+        version_base64 = base64.b64encode(version_bytes).decode('utf-8')
+        version_hex = hashlib.sha256(manifest_json.encode()).hexdigest()
+
+        assert version_hex == expected_version_hex
+        assert version_base64 == expected_version_base64
+
+    def test_manifest_version_env_only_sdl(self):
+        """Test manifest version calculation for env-only SDL."""
+        import hashlib
+        import json
+        import base64
+        from akash.modules.manifest.utils import ManifestUtils
+
+        env_only_sdl = '''version: "2.0"
+services:
+  nginx:
+    image: nginx:alpine
+    env:
+      - UPDATE_VERSION=v2
+      - DEPLOYMENT_UPDATE=true
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+profiles:
+  compute:
+    nginx:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      attributes:
+        host: akash
+      pricing:
+        nginx:
+          denom: uakt
+          amount: 1000
+deployment:
+  nginx:
+    global:
+      profile: nginx
+      count: 1
+'''
+
+        expected_version_hex = "24009b8ea9cc4c46af0115405d54e8066d4d0b374507d71caa087407e0650f63"
+        expected_version_base64 = "JACbjqnMTEavARVAXVToBm1NCzdFB9ccqgh0B+BlD2M="
+
+        manifest_utils = ManifestUtils()
+        parse_result = manifest_utils.parse_sdl(env_only_sdl)
+        assert parse_result.get('status') == 'success'
+
+        manifest_data = parse_result.get('manifest_data', [])
+        legacy_manifest = manifest_utils._create_legacy_manifest(manifest_data)
+        manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+
+        manifest_json = manifest_utils._escape_html(manifest_json)
+
+        version_bytes = hashlib.sha256(manifest_json.encode()).digest()
+        version_base64 = base64.b64encode(version_bytes).decode('utf-8')
+        version_hex = hashlib.sha256(manifest_json.encode()).hexdigest()
+
+        assert version_hex == expected_version_hex
+        assert version_base64 == expected_version_base64
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -309,6 +309,9 @@ class ManifestUtils:
 
         return json_str
 
+    def _escape_html(self, text: str) -> str:
+        return text.replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+
     def _create_legacy_manifest(self, manifest_data: List[Dict]) -> List[Dict]:
         """
         Create manifest compatible with legacy providers (v0.6.x).

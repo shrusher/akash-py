@@ -510,6 +510,7 @@ class TestDeploymentTransactionOperations:
     def test_transaction_methods_exist(self):
         """Test that all required transaction methods exist."""
         assert hasattr(self.client, 'create_deployment')
+        assert hasattr(self.client, 'update_deployment')
         assert hasattr(self.client, 'close_deployment')
         assert hasattr(self.client, 'deposit_deployment')
         assert hasattr(self.client, 'close_group')
@@ -517,6 +518,7 @@ class TestDeploymentTransactionOperations:
         assert hasattr(self.client, 'start_group')
 
         assert callable(getattr(self.client, 'create_deployment'))
+        assert callable(getattr(self.client, 'update_deployment'))
         assert callable(getattr(self.client, 'close_deployment'))
         assert callable(getattr(self.client, 'deposit_deployment'))
 
@@ -525,7 +527,12 @@ class TestDeploymentTransactionOperations:
         import inspect
 
         sig = inspect.signature(self.client.create_deployment)
-        required_params = ['wallet', 'groups']
+        required_params = ['wallet', 'sdl_yaml']
+        for param in required_params:
+            assert param in sig.parameters
+
+        sig = inspect.signature(self.client.update_deployment)
+        required_params = ['wallet', 'sdl_yaml']
         for param in required_params:
             assert param in sig.parameters
 
@@ -789,7 +796,7 @@ class TestDeploymentErrorHandlingScenarios:
 
             result = self.client.create_deployment(
                 Mock(address="akash1test"),
-                []
+                "invalid: yaml content"
             )
 
             assert not result.success

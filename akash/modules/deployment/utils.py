@@ -366,7 +366,7 @@ class DeploymentUtils:
                 )
 
             # Convert to actual uAKT amount
-            price_amount = int(resource_data["price"]) * (10**18)
+            price_amount = int(resource_data["price"]) * (10 ** 18)
 
             endpoints_specs = []
             if "endpoints" in resource_data:
@@ -420,24 +420,6 @@ class DeploymentUtils:
                 "requirements", {"signed_by": {}, "attributes": []}
             ),
             "resources": resources,
-        }
-
-    def _update_deployment_msg(self, owner: str, dseq: int, version: bytes) -> dict:
-        """
-        Create MsgUpdateDeployment message dictionary.
-
-        Args:
-            owner: Deployment owner address
-            dseq: Deployment sequence number
-            version: New version hash (bytes)
-
-        Returns:
-            dict: Message dictionary for MsgUpdateDeployment
-        """
-        return {
-            "@type": "/akash.deployment.v1beta3.MsgUpdateDeployment",
-            "id": {"owner": owner, "dseq": str(dseq)},
-            "version": version.hex() if isinstance(version, bytes) else version,
         }
 
     def _close_deployment_msg(self, owner: str, dseq: int) -> dict:
@@ -927,81 +909,6 @@ class DeploymentUtils:
         except Exception as e:
             logger.error(f"Error setting up log stream: {e}")
             raise
-
-    def create_deployment_from_sdl(
-        self,
-        sdl_content: str,
-        wallet,
-        deposit: str = "500000",
-        memo: str = "",
-        fee_amount: str = "5000"
-    ) -> Dict[str, Any]:
-        """
-        Create deployment from SDL with automatic hash calculation and group creation.
-        Simplifies the deployment creation process.
-
-        Args:
-            sdl_content: SDL YAML content as string
-            wallet: AkashWallet instance
-            deposit: Deployment deposit in uAKT
-            memo: Transaction memo
-            fee_amount: Transaction fee in uAKT
-
-        Returns:
-            Dict with deployment result including dseq, tx_hash, groups, version_hash
-        """
-        try:
-            import yaml
-
-            sdl_data = yaml.safe_load(sdl_content)
-
-            parse_result = self.akash_client.manifest.parse_sdl(sdl_content)
-            if parse_result.get('status') != 'success':
-                raise ValueError(f"SDL parsing failed: {parse_result.get('error')}")
-
-            manifest_data = parse_result.get('manifest_data', [])
-
-            legacy_manifest = self.akash_client.manifest._create_legacy_manifest(manifest_data)
-            working_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
-            version_hash = hashlib.sha256(working_json.encode()).hexdigest()
-
-            groups = self._create_groups_from_sdl(sdl_data)
-
-            logger.info(f"Creating deployment with hash {version_hash}")
-            logger.info(f"Created {len(groups)} deployment groups")
-
-            if hasattr(self, 'akash_client'):
-                result = self.akash_client.deployment.create_deployment(
-                    wallet=wallet,
-                    groups=groups,
-                    version=version_hash,
-                    deposit=deposit,
-                    memo=memo,
-                    fee_amount=fee_amount
-                )
-            else:
-                raise ValueError("This method requires an initialized AkashClient")
-
-            if result.success:
-                return {
-                    "success": True,
-                    "dseq": result.dseq,
-                    "tx_hash": result.tx_hash,
-                    "version_hash": version_hash,
-                    "groups": groups
-                }
-            else:
-                return {
-                    "success": False,
-                    "error": result.raw_log
-                }
-
-        except Exception as e:
-            logger.error(f"Deployment creation failed: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
 
     def _create_groups_from_sdl(self, sdl_data: Dict) -> List[Dict]:
         """

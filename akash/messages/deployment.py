@@ -127,8 +127,6 @@ def convert_msg_update_deployment(msg_dict, any_msg):
         MsgUpdateDeployment,
     )
     from akash.proto.akash.deployment.v1beta3.deployment_pb2 import DeploymentID
-    import hashlib
-    import json
 
     pb_msg = MsgUpdateDeployment()
 
@@ -137,9 +135,21 @@ def convert_msg_update_deployment(msg_dict, any_msg):
     deployment_id.dseq = int(msg_dict["id"]["dseq"])
     pb_msg.id.CopyFrom(deployment_id)
 
-    deployment_data = json.dumps(msg_dict, sort_keys=True).encode("utf-8")
-    version_hash = hashlib.sha256(deployment_data).digest()
-    pb_msg.version = version_hash
+    if "version" in msg_dict and msg_dict["version"]:
+        if isinstance(msg_dict["version"], str):
+            try:
+                pb_msg.version = bytes.fromhex(msg_dict["version"])
+            except ValueError:
+                import hashlib
+                pb_msg.version = hashlib.sha256(msg_dict["version"].encode("utf-8")).digest()
+        else:
+            pb_msg.version = msg_dict["version"]
+    else:
+        import hashlib
+        import json
+        deployment_data = json.dumps(msg_dict, sort_keys=True).encode("utf-8")
+        version_hash = hashlib.sha256(deployment_data).digest()
+        pb_msg.version = version_hash
 
     any_msg.Pack(pb_msg, type_url_prefix="")
     return any_msg

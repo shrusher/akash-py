@@ -15,7 +15,7 @@ class DeploymentTx:
     def create_deployment(
         self,
         wallet,
-        groups: List[Dict[str, Any]],
+        sdl_yaml: str,
         deposit: str = "5000000",
         deposit_denom: str = "uakt",
         version: str = None,
@@ -26,14 +26,14 @@ class DeploymentTx:
         use_simulation: bool = True,
     ) -> BroadcastResult:
         """
-        Create deployment with complete resource specifications.
+        Create deployment from SDL YAML.
 
         Args:
             wallet: AkashWallet instance
-            groups: List of group specifications with resources
+            sdl_yaml: SDL YAML content as string (required)
             deposit: Deposit amount (default: "5000000")
             deposit_denom: Deposit token denomination (default: "uakt")
-            version: Deployment version (defaults to timestamp)
+            version: Deployment version (calculated from SDL if not provided)
             memo: Transaction memo
             fee_amount: Fee amount in uakt
             gas_limit: Gas limit override
@@ -46,23 +46,36 @@ class DeploymentTx:
         try:
             import hashlib
             import json
-            logger.info(f"Creating deployment with {len(groups)} groups")
+            import base64
+            import yaml
+
+            if not sdl_yaml:
+                raise ValueError("sdl_yaml is required")
+
+            sdl_data = yaml.safe_load(sdl_yaml)
+            deployment_groups = self._create_groups_from_sdl(sdl_data)
+
+            if version is None:
+                parse_result = self.akash_client.manifest.parse_sdl(sdl_yaml)
+                if parse_result.get('status') != 'success':
+                    raise ValueError(f"SDL parsing failed: {parse_result.get('error')}")
+
+                manifest_data = parse_result.get('manifest_data', [])
+                legacy_manifest = self.akash_client.manifest._create_legacy_manifest(manifest_data)
+                manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+                manifest_json = self.akash_client.manifest._escape_html(manifest_json)
+                version_hash = hashlib.sha256(manifest_json.encode()).hexdigest()
+
+            logger.info(f"Creating deployment with {len(deployment_groups)} deployment_groups")
 
             dseq = int(time.time())
-            if version is None:
-                version_data = {
-                    "groups": groups,
-                    "timestamp": dseq
-                }
-                version_json = json.dumps(version_data, sort_keys=True, separators=(',', ':'))
-                version = hashlib.sha256(version_json.encode()).hexdigest()
 
             msg_dict = {
                 "@type": "/akash.deployment.v1beta3.MsgCreateDeployment",
                 "id": {"owner": wallet.address, "dseq": str(dseq)},
-                "version": version,
+                "version": version_hash,
                 "groups": [
-                    self._group_spec_to_dict(group_data) for group_data in groups
+                    self._group_spec_to_dict(group_data) for group_data in deployment_groups
                 ],
                 "depositor": wallet.address,
                 "deposit": {"denom": deposit_denom, "amount": deposit},
@@ -92,7 +105,7 @@ class DeploymentTx:
     def update_deployment(
         self,
         wallet,
-        sdl: Dict[str, Any],
+        sdl_yaml: str,
         owner: str = None,
         dseq: int = None,
         memo: str = "",
@@ -102,11 +115,11 @@ class DeploymentTx:
         use_simulation: bool = True,
     ) -> BroadcastResult:
         """
-        Update deployment with SDL content.
+        Update deployment with SDL YAML content.
 
         Args:
             wallet: AkashWallet instance
-            sdl: SDL configuration dictionary
+            sdl_yaml: SDL YAML content as string (required)
             owner: Deployment owner address (defaults to wallet address)
             dseq: Deployment sequence number (required)
             memo: Transaction memo
@@ -119,18 +132,41 @@ class DeploymentTx:
             BroadcastResult with transaction details
         """
         try:
+            import hashlib
+            import json
+            import base64
+            import yaml
+
+            if not sdl_yaml:
+                raise ValueError("sdl_yaml is required")
+
             if owner is None:
                 owner = wallet.address
 
             if dseq is None:
                 raise ValueError("dseq (deployment sequence number) is required")
 
-            version_bytes = self.generate_sdl_version(sdl)
+            parse_result = self.akash_client.manifest.parse_sdl(sdl_yaml)
+            if parse_result.get('status') != 'success':
+                raise ValueError(f"SDL parsing failed: {parse_result.get('error')}")
+
+            manifest_data = parse_result.get('manifest_data', [])
+            legacy_manifest = self.akash_client.manifest._create_legacy_manifest(manifest_data)
+            manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+
+            manifest_json = self.akash_client.manifest._escape_html(manifest_json)
+
+            version_hash = hashlib.sha256(manifest_json.encode()).hexdigest()
+
             logger.info(
-                f"Updating deployment {dseq} with SDL (version hash: {version_bytes.hex()[:16]}...)"
+                f"Updating deployment {dseq} with manifest version: {version_hash}"
             )
 
-            msg_dict = self._update_deployment_msg(owner, dseq, version_bytes)
+            msg_dict = {
+                "@type": "/akash.deployment.v1beta3.MsgUpdateDeployment",
+                "id": {"owner": owner, "dseq": str(dseq)},
+                "version": version_hash
+            }
 
             return broadcast_transaction_rpc(
                 client=self.akash_client,
