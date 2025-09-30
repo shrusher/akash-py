@@ -654,7 +654,6 @@ class TestmTLSErrorHandling:
                 mock_publish.return_value = Mock(success=True, tx_hash="TEST123")
                 result = cert_client.create_certificate_for_mtls(mock_wallet)
                 assert result["status"] == "error"
-                # Just verify we got an error - the exact message can vary due to mocking internals
                 assert "error" in result
                 assert len(result["error"]) > 0
 

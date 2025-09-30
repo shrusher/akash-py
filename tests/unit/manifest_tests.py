@@ -293,7 +293,7 @@ deployment:
         assert service["args"] == ["-c", "nginx -g 'daemon off;'"]
 
     def test_parse_service_missing_required_fields(self):
-        """Test parsing service missing required image field."""
+        """Test parsing service missing required image field should fail."""
         mock_akash_client = Mock()
         manifest_client = ManifestClient(mock_akash_client)
 
@@ -330,11 +330,8 @@ deployment:
 
         result = manifest_client.parse_sdl(sdl_missing_image)
 
-        assert result["status"] == "success"
-        manifest = result["manifest_data"]
-        service = manifest[0]["Services"][0]
-
-        assert service["name"] == "web"
+        assert result.get("valid") == False
+        assert "missing required field 'image'" in result.get("error", "")
 
 
 class TestSDLProfileParsing:
