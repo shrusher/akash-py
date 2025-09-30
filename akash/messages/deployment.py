@@ -88,12 +88,32 @@ def convert_msg_create_deployment(msg_dict, any_msg):
                     val=storage_data["quantity"]["val"].encode("utf-8")
                 )
                 storage = Storage(name=storage_data["name"], quantity=storage_val)
+
+                if "attributes" in storage_data and storage_data["attributes"]:
+                    from akash.proto.akash.base.v1beta3.attribute_pb2 import Attribute
+                    for attr_data in storage_data["attributes"]:
+                        attr = Attribute()
+                        attr.key = attr_data["key"]
+                        attr.value = attr_data["value"]
+                        storage.attributes.append(attr)
+
                 resources.storage.append(storage)
 
             from akash.proto.akash.base.v1beta3.gpu_pb2 import GPU
 
-            gpu_val = ResourceValue(val=b"0")
+            gpu_units = resource_data["resource"].get("gpu", {}).get("units", {}).get("val", "0")
+            gpu_val = ResourceValue(val=gpu_units.encode("utf-8"))
             gpu = GPU(units=gpu_val)
+
+            gpu_attributes = resource_data["resource"].get("gpu", {}).get("attributes", [])
+            if gpu_attributes:
+                from akash.proto.akash.base.v1beta3.attribute_pb2 import Attribute
+                for attr_data in gpu_attributes:
+                    attr = Attribute()
+                    attr.key = attr_data["key"]
+                    attr.value = attr_data["value"]
+                    gpu.attributes.append(attr)
+
             resources.gpu.CopyFrom(gpu)
 
             if "endpoints" in resource_data["resource"]:

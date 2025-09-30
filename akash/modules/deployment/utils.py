@@ -224,20 +224,16 @@ class DeploymentUtils:
                         "resources": [
                             {
                                 "cpu": self._parse_cpu_units(
-                                    resources_config.get("cpu", {}).get("units", "0.1")
+                                    resources_config.get("cpu", {}).get("units")
                                 ),
                                 "memory": self._parse_memory_size(
-                                    resources_config.get("memory", {}).get(
-                                        "size", "128Mi"
-                                    )
+                                    resources_config.get("memory", {}).get("size")
                                 ),
                                 "storage": self._parse_storage_size(
-                                    resources_config.get("storage", {}).get(
-                                        "size", "1Gi"
-                                    )
+                                    resources_config.get("storage", {}).get("size")
                                 ),
-                                "price": pricing.get("amount", "100"),
-                                "count": placement_config.get("count", 1),
+                                "price": pricing.get("amount"),
+                                "count": placement_config.get("count"),
                             }
                         ],
                     }
@@ -944,11 +940,11 @@ class DeploymentUtils:
 
                 resources = compute_profile.get("resources", {})
                 group_resource = {
-                    'cpu': self._parse_cpu_to_millis(resources.get("cpu", {}).get("units", "0.1")),
-                    'memory': self._parse_memory_to_bytes(resources.get("memory", {}).get("size", "128Mi")),
-                    'storage': self._parse_storage_to_bytes(resources.get("storage", {}).get("size", "512Mi")),
-                    'price': pricing.get("amount", "1000"),
-                    'count': placement_spec.get("count", 1)
+                    'cpu': self._parse_cpu_to_millis(resources.get("cpu", {}).get("units")),
+                    'memory': self._parse_memory_to_bytes(resources.get("memory", {}).get("size")),
+                    'storage': self._parse_storage_to_bytes(resources.get("storage", {}).get("size")),
+                    'price': pricing.get("amount"),
+                    'count': placement_spec.get("count")
                 }
 
                 if needs_endpoints:
@@ -982,7 +978,7 @@ class DeploymentUtils:
                 return str(int(float(cpu_value) * 1000))
         elif isinstance(cpu_value, (int, float)):
             return str(int(cpu_value * 1000))
-        return "100"  # Default
+        raise ValueError(f"Invalid CPU value: {cpu_value}. Expected string with 'm' suffix or numeric value.")
 
     def _parse_memory_to_bytes(self, memory_value: str) -> str:
         """Convert memory value to bytes string."""
@@ -996,7 +992,7 @@ class DeploymentUtils:
             else:
                 return str(int(memory_value))
         except:
-            return str(128 * 1024 * 1024)  # Default 128Mi
+            raise ValueError(f"Invalid memory value: {memory_value}. Expected format like '128Mi', '2Gi', '512Ki'.")
 
     def _parse_storage_to_bytes(self, storage_value: str) -> str:
         """Convert storage value to bytes string."""
@@ -1010,7 +1006,7 @@ class DeploymentUtils:
             else:
                 return str(int(storage_value))
         except:
-            return str(512 * 1024 * 1024)  # Default 512Mi
+            raise ValueError(f"Invalid storage value: {storage_value}. Expected format like '512Mi', '2Gi', '1Ti'.")
 
     def submit_manifest_to_provider(
         self,
