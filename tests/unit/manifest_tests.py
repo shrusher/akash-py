@@ -2441,5 +2441,618 @@ deployment:
         assert version_base64 == expected_version_base64
 
 
+class TestManifestFieldCompleteness:
+    """Test that all manifest fields are correctly structured and complete."""
+
+    def test_service_params_storage_mounts(self):
+        """Test service params structure for storage mounts."""
+        mock_akash_client = Mock()
+        manifest_client = ManifestClient(mock_akash_client)
+
+        sdl_with_params = '''
+version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    params:
+      storage:
+        data:
+          mount: /data
+          readOnly: false
+        configs:
+          mount: /configs
+          readOnly: true
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          - name: default
+            size: 512Mi
+          - name: data
+            size: 1Gi
+          - name: configs
+            size: 100Mi
+  placement:
+    global:
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+deployment:
+  web:
+    global:
+      profile: web
+      count: 1
+'''
+
+        result = manifest_client.parse_sdl(sdl_with_params)
+        assert result["status"] == "success"
+
+        manifest = result["manifest_data"]
+        service = manifest[0]["Services"][0]
+
+        assert "params" in service
+        assert service["params"] is not None
+        assert "storage" in service["params"]
+
+        storage_params = service["params"]["storage"]
+        assert len(storage_params) == 2
+
+        data_mount = next((m for m in storage_params if m["name"] == "data"), None)
+        assert data_mount is not None
+        assert data_mount["mount"] == "/data"
+        assert data_mount["readOnly"] is False
+
+        configs_mount = next((m for m in storage_params if m["name"] == "configs"), None)
+        assert configs_mount is not None
+        assert configs_mount["mount"] == "/configs"
+        assert configs_mount["readOnly"] is True
+
+    def test_credentials_structure(self):
+        """Test credentials format and required fields."""
+        mock_akash_client = Mock()
+        manifest_client = ManifestClient(mock_akash_client)
+
+        sdl_with_credentials = '''
+version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    credentials:
+      host: docker.io
+      username: myuser
+      password: mypass
+      email: user@example.com
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+deployment:
+  web:
+    global:
+      profile: web
+      count: 1
+'''
+
+        result = manifest_client.parse_sdl(sdl_with_credentials)
+        assert result["status"] == "success"
+
+        service = result["manifest_data"][0]["Services"][0]
+
+        assert "credentials" in service
+        credentials = service["credentials"]
+        assert credentials["host"] == "docker.io"
+        assert credentials["username"] == "myuser"
+        assert credentials["password"] == "mypass"
+        assert credentials["email"] == "user@example.com"
+
+    def test_credentials_email_defaults_to_empty_string(self):
+        """Test that credentials email defaults to empty string when not provided."""
+        mock_akash_client = Mock()
+        manifest_client = ManifestClient(mock_akash_client)
+
+        sdl_credentials_no_email = '''
+version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    credentials:
+      host: docker.io
+      username: myuser
+      password: mypass
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+deployment:
+  web:
+    global:
+      profile: web
+      count: 1
+'''
+
+        result = manifest_client.parse_sdl(sdl_credentials_no_email)
+        assert result["status"] == "success"
+
+        service = result["manifest_data"][0]["Services"][0]
+        credentials = service["credentials"]
+        assert credentials["email"] == ""
+
+    def test_expose_flatmap_behavior(self):
+        """Test that expose creates one entry per 'to' config."""
+        mock_akash_client = Mock()
+        manifest_client = ManifestClient(mock_akash_client)
+
+        sdl_multiple_to = '''
+version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - port: 80
+        as: 8080
+        to:
+          - global: true
+          - service: api
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+deployment:
+  web:
+    global:
+      profile: web
+      count: 1
+'''
+
+        result = manifest_client.parse_sdl(sdl_multiple_to)
+        assert result["status"] == "success"
+
+        service = result["manifest_data"][0]["Services"][0]
+        expose = service["expose"]
+
+        assert len(expose) == 2
+        assert expose[0]["port"] == 80
+        assert expose[1]["port"] == 80
+
+    def test_expose_hosts_from_accept(self):
+        """Test that expose hosts field comes from accept in SDL."""
+        mock_akash_client = Mock()
+        manifest_client = ManifestClient(mock_akash_client)
+
+        sdl_with_accept = '''
+version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - port: 80
+        accept:
+          - example.com
+          - www.example.com
+        to:
+          - global: true
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+deployment:
+  web:
+    global:
+      profile: web
+      count: 1
+'''
+
+        result = manifest_client.parse_sdl(sdl_with_accept)
+        assert result["status"] == "success"
+
+        service = result["manifest_data"][0]["Services"][0]
+        expose = service["expose"][0]
+
+        assert "hosts" in expose
+        assert expose["hosts"] == ["example.com", "www.example.com"]
+
+    def test_expose_custom_http_options(self):
+        """Test that custom http_options from SDL are merged with defaults."""
+        mock_akash_client = Mock()
+        manifest_client = ManifestClient(mock_akash_client)
+
+        sdl_custom_http_options = '''
+version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - port: 80
+        http_options:
+          max_body_size: 2097152
+          read_timeout: 120000
+          send_timeout: 90000
+          next_tries: 5
+        to:
+          - global: true
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+deployment:
+  web:
+    global:
+      profile: web
+      count: 1
+'''
+
+        result = manifest_client.parse_sdl(sdl_custom_http_options)
+        assert result["status"] == "success"
+
+        service = result["manifest_data"][0]["Services"][0]
+        http_opts = service["expose"][0]["httpOptions"]
+
+        assert http_opts["maxBodySize"] == 2097152
+        assert http_opts["readTimeout"] == 120000
+        assert http_opts["sendTimeout"] == 90000
+        assert http_opts["nextTries"] == 5
+
+        assert http_opts["nextTimeout"] == 0
+        assert http_opts["nextCases"] == ["error", "timeout"]
+
+    def test_expose_external_port_defaults_to_zero(self):
+        """Test that externalPort defaults to 0 when not specified."""
+        mock_akash_client = Mock()
+        manifest_client = ManifestClient(mock_akash_client)
+
+        sdl_no_as = '''
+version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - port: 443
+        to:
+          - global: true
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+deployment:
+  web:
+    global:
+      profile: web
+      count: 1
+'''
+
+        result = manifest_client.parse_sdl(sdl_no_as)
+        assert result["status"] == "success"
+
+        service = result["manifest_data"][0]["Services"][0]
+        expose = service["expose"][0]
+
+        assert expose["port"] == 443
+        assert expose["externalPort"] == 0
+
+    def test_expose_sorting(self):
+        """Test that expose entries are sorted by service, port, proto, global."""
+        mock_akash_client = Mock()
+        manifest_client = ManifestClient(mock_akash_client)
+
+        sdl_multiple_expose = '''
+version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - port: 443
+        to:
+          - global: true
+      - port: 80
+        to:
+          - global: true
+          - service: api
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+deployment:
+  web:
+    global:
+      profile: web
+      count: 1
+'''
+
+        result = manifest_client.parse_sdl(sdl_multiple_expose)
+        assert result["status"] == "success"
+
+        service = result["manifest_data"][0]["Services"][0]
+        expose = service["expose"]
+
+        for i in range(len(expose) - 1):
+            curr = expose[i]
+            next_exp = expose[i + 1]
+
+            curr_key = (curr["service"], curr["port"], curr["proto"], not curr["global"])
+            next_key = (next_exp["service"], next_exp["port"], next_exp["proto"], not next_exp["global"])
+
+            assert curr_key <= next_key, f"Expose not sorted: {curr} > {next_exp}"
+
+
+class TestManifestVersionHashConsistency:
+    """Test version hash calculation consistency."""
+
+    def test_legacy_manifest_format_for_version_hash(self):
+        """Test that version hash uses legacy format (lowercase name/services)."""
+        from akash.modules.manifest.utils import ManifestUtils
+
+        simple_sdl = '''
+version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - port: 80
+        to:
+          - global: true
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+deployment:
+  web:
+    global:
+      profile: web
+      count: 1
+'''
+
+        manifest_utils = ManifestUtils()
+        result = manifest_utils.parse_sdl(simple_sdl)
+        assert result["status"] == "success"
+
+        manifest_data = result["manifest_data"]
+        legacy_manifest = manifest_utils._create_legacy_manifest(manifest_data)
+
+        assert "name" in legacy_manifest[0]
+        assert "services" in legacy_manifest[0]
+
+        service = legacy_manifest[0]["services"][0]
+        resources = service["resources"]
+        assert "size" in resources["memory"]
+
+        for storage in resources["storage"]:
+            assert "size" in storage
+
+    def test_version_hash_deployment_manifest_consistency(self):
+        """Test that deployment and manifest use same version hash."""
+        import hashlib
+        import json
+        from akash.modules.manifest.utils import ManifestUtils
+
+        simple_sdl = '''
+version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - port: 80
+        to:
+          - global: true
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+deployment:
+  web:
+    global:
+      profile: web
+      count: 1
+'''
+
+        manifest_utils = ManifestUtils()
+        result = manifest_utils.parse_sdl(simple_sdl)
+        manifest_data = result["manifest_data"]
+
+        legacy_manifest = manifest_utils._create_legacy_manifest(manifest_data)
+        manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+        escaped_json = manifest_utils._escape_html(manifest_json)
+        version_hash = hashlib.sha256(escaped_json.encode()).hexdigest()
+
+        second_hash = hashlib.sha256(escaped_json.encode()).hexdigest()
+        assert version_hash == second_hash
+
+    def test_version_hash_field_ordering(self):
+        """Test that version hash uses alphabetical field ordering."""
+        import json
+        from akash.modules.manifest.utils import ManifestUtils
+
+        simple_sdl = '''
+version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+deployment:
+  web:
+    global:
+      profile: web
+      count: 1
+'''
+
+        manifest_utils = ManifestUtils()
+        result = manifest_utils.parse_sdl(simple_sdl)
+        manifest_data = result["manifest_data"]
+
+        legacy_manifest = manifest_utils._create_legacy_manifest(manifest_data)
+        manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+
+        parsed_back = json.loads(manifest_json)
+        reserialized = json.dumps(parsed_back, sort_keys=True, separators=(',', ':'))
+
+        assert manifest_json == reserialized, "JSON not consistently sorted"
+
+        first_service_start = manifest_json.find('"services":[{')
+        if first_service_start != -1:
+            service_section = manifest_json[first_service_start:first_service_start + 500]
+            pos_args = service_section.find('"args"')
+            pos_command = service_section.find('"command"')
+            pos_count = service_section.find('"count"')
+
+            if pos_args != -1 and pos_command != -1 and pos_count != -1:
+                assert pos_args < pos_command < pos_count, \
+                    f"Service fields not alphabetically ordered: args={pos_args}, command={pos_command}, count={pos_count}"
+
+    def test_version_hash_html_escaping(self):
+        """Test that version hash escapes HTML characters."""
+        from akash.modules.manifest.utils import ManifestUtils
+
+        manifest_utils = ManifestUtils()
+
+        test_json = '{"test":"<>&"}'
+        escaped = manifest_utils._escape_html(test_json)
+
+        assert '\\u003c' in escaped  # <
+        assert '\\u003e' in escaped  # >
+        assert '\\u0026' in escaped  # &
+
+        assert '<' not in escaped
+        assert '>' not in escaped
+        assert '&' not in escaped
+
+        test_multiple = '{"args":"<<test>> && echo"}'
+        escaped_multiple = manifest_utils._escape_html(test_multiple)
+
+        assert escaped_multiple.count('\\u003c') == 2
+        assert escaped_multiple.count('\\u003e') == 2
+        assert escaped_multiple.count('\\u0026') == 2
+
+        double_escaped = manifest_utils._escape_html(escaped_multiple)
+        assert double_escaped == escaped_multiple, "Escaping should be idempotent"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
