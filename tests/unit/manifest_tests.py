@@ -2218,6 +2218,82 @@ deployment:
         assert version_hex == expected_version_hex
         assert version_base64 == expected_version_base64
 
+    def test_manifest_version_gpu_another(self):
+        """Test manifest version calculation for SDL with gpu."""
+        import hashlib
+        import json
+        import base64
+        from akash.modules.manifest.utils import ManifestUtils
+
+        sdl = '''
+version: "2.0"
+services:
+  ml-workload:
+    image: nvidia/cuda:11.8.0-base-ubuntu22.04
+    expose:
+      - port: 8080
+        as: 80
+        to:
+          - global: true
+    env:
+      - CUDA_VISIBLE_DEVICES=0
+      - ML_TEST=enabled
+    command:
+      - "bash"
+      - "-c"
+    args:
+      - 'apt-get update && apt-get install -y nginx && (nvidia-smi || echo "GPU info not available") > /usr/share/nginx/html/index.html && echo "<br><br>GPU: A100 40GB requested" >> /usr/share/nginx/html/index.html && nginx -g "daemon off;"'
+profiles:
+  compute:
+    ml-workload:
+      resources:
+        cpu:
+          units: 2
+        memory:
+          size: 8Gi
+        gpu:
+          units: 1
+          attributes:
+            vendor:
+              nvidia:
+              - model: a100
+                ram: 80Gi
+        storage:
+          - size: 10Gi
+  placement:
+    global:
+      attributes:
+        host: akash
+      pricing:
+        ml-workload:
+          denom: uakt
+          amount: 150000
+deployment:
+  ml-workload:
+    global:
+      profile: ml-workload
+      count: 1
+'''
+
+        expected_version_hex = "2a5861f18e5c9193761e1086bae28830793c989cee3638928dc3ff50dcf972ed"
+        expected_version_base64 = "Klhh8Y5ckZN2HhCGuuKIMHk8mJzuNjiSjcP/UNz5cu0="
+
+        manifest_utils = ManifestUtils()
+        parse_result = manifest_utils.parse_sdl(sdl)
+        assert parse_result.get('status') == 'success'
+
+        manifest_data = parse_result.get('manifest_data', [])
+        legacy_manifest = manifest_utils._create_legacy_manifest(manifest_data)
+        manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+        manifest_json = manifest_utils._escape_html(manifest_json)
+
+        version_bytes = hashlib.sha256(manifest_json.encode()).digest()
+        version_base64 = base64.b64encode(version_bytes).decode('utf-8')
+        version_hex = hashlib.sha256(manifest_json.encode()).hexdigest()
+
+        assert version_hex == expected_version_hex
+        assert version_base64 == expected_version_base64
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
