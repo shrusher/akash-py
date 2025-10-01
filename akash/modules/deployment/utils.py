@@ -91,6 +91,114 @@ class DeploymentUtils:
 
         return volumes
 
+    def _parse_gpu_config(self, gpu_config: Dict) -> Dict:
+        """
+        Parse GPU configuration from SDL and return structured GPU data with attributes.
+
+        Args:
+            gpu_config: GPU configuration dict from SDL with units and optional attributes
+
+        Returns:
+            Dict with 'units' and 'attributes' (empty list if no GPU or attributes)
+        """
+        GPU_SUPPORTED_VENDORS = ["nvidia", "amd"]
+        GPU_SUPPORTED_INTERFACES = ["pcie", "sxm"]
+
+        if not gpu_config:
+            return {
+                "units": "0",
+                "attributes": []
+            }
+
+        units = gpu_config.get("units", 0)
+        units_int = int(units) if units is not None else 0
+
+        if units_int == 0:
+            return {
+                "units": "0",
+                "attributes": []
+            }
+
+        attributes = gpu_config.get("attributes", {})
+
+        if units_int > 0 and not attributes:
+            raise ValueError("GPU must have attributes if units is not 0")
+
+        vendor_specs = attributes.get("vendor", {})
+        if not vendor_specs:
+            raise ValueError("GPU must specify a vendor if units is not 0")
+
+        for vendor in vendor_specs.keys():
+            if vendor not in GPU_SUPPORTED_VENDORS:
+                raise ValueError(
+                    f"Unsupported GPU vendor '{vendor}'. Must be one of: {', '.join(GPU_SUPPORTED_VENDORS)}"
+                )
+
+        gpu_attributes = []
+        for vendor, models in vendor_specs.items():
+            if not models:
+                gpu_attributes.append({
+                    "key": f"vendor/{vendor}/model/*",
+                    "value": "true"
+                })
+            else:
+                for model_spec in models:
+                    if isinstance(model_spec, str):
+                        gpu_attributes.append({
+                            "key": f"vendor/{vendor}/model/{model_spec}",
+                            "value": "true"
+                        })
+                    elif isinstance(model_spec, dict):
+                        model_name = model_spec.get("model", "*")
+                        key = f"vendor/{vendor}/model/{model_name}"
+
+                        if "ram" in model_spec:
+                            key += f"/ram/{model_spec['ram']}"
+
+                        if "interface" in model_spec:
+                            interface = model_spec["interface"]
+                            if interface not in GPU_SUPPORTED_INTERFACES:
+                                raise ValueError(
+                                    f"Unsupported GPU interface '{interface}'. Must be one of: {', '.join(GPU_SUPPORTED_INTERFACES)}"
+                                )
+                            key += f"/interface/{interface}"
+
+                        gpu_attributes.append({
+                            "key": key,
+                            "value": "true"
+                        })
+
+        gpu_attributes.sort(key=lambda x: x["key"])
+
+        return {
+            "units": str(units_int),
+            "attributes": gpu_attributes
+        }
+
+    def _build_gpu_for_deployment(self, gpu_data: Dict) -> Dict:
+        """
+        Build GPU structure for deployment message.
+
+        Args:
+            gpu_data: GPU data dict with 'units' and 'attributes'
+
+        Returns:
+            Dict with GPU units and attributes in deployment message format
+        """
+        if not gpu_data or not isinstance(gpu_data, dict):
+            return {
+                "units": {"val": "0"},
+                "attributes": []
+            }
+
+        units = gpu_data.get("units", "0")
+        attributes = gpu_data.get("attributes", [])
+
+        return {
+            "units": {"val": str(units)},
+            "attributes": attributes
+        }
+
     def _safe_decode_bytes(self, bytes_data: bytes) -> str:
         """
         Safely decode bytes to string, handling non-UTF8 data.
@@ -497,10 +605,7 @@ class DeploymentUtils:
                         "attributes": []
                     },
                     "storage": storage_specs,
-                    "gpu": {
-                        "units": {"val": str(resource_data.get("gpu", "0"))},
-                        "attributes": []
-                    },
+                    "gpu": self._build_gpu_for_deployment(resource_data.get("gpu", {})),
                 },
                 "count": resource_data.get("count", 1),
                 "price": {
@@ -1044,10 +1149,13 @@ class DeploymentUtils:
 
                 resources = compute_profile.get("resources", {})
                 storage_config = resources.get("storage", {})
+                gpu_config = resources.get("gpu", {})
+
                 group_resource = {
                     'cpu': self._parse_cpu_to_millis(resources.get("cpu", {}).get("units")),
                     'memory': self._parse_memory_to_bytes(resources.get("memory", {}).get("size")),
                     'storage': self._build_storage_volumes(storage_config),
+                    'gpu': self._parse_gpu_config(gpu_config),
                     'price': pricing.get("amount"),
                     'count': placement_spec.get("count")
                 }
