@@ -244,46 +244,63 @@ class ManifestUtils:
     def _build_expose(self, expose_list: List, endpoint_sequence_numbers: Dict = None) -> List:
         """Build expose section."""
         result = []
+        if endpoint_sequence_numbers is None:
+            endpoint_sequence_numbers = {}
 
         for expose in expose_list:
             port = expose.get("port")
             if port is None:
                 raise ValueError("Port is required in expose configuration")
 
-            expose_entry = {
-                "port": port,
-                "externalPort": expose.get("as") or port,
-                "proto": expose.get("proto", "tcp").upper(),
-                "service": "",
-                "global": False,
-                "hosts": None,
-                "httpOptions": {
-                    "maxBodySize": 1048576,
-                    "readTimeout": 60000,
-                    "sendTimeout": 60000,
-                    "nextTries": 3,
-                    "nextTimeout": 0,
-                    "nextCases": ["error", "timeout"]
-                },
-                "ip": "",
-                "endpointSequenceNumber": 0
+            http_options_defaults = {
+                "maxBodySize": 1048576,
+                "readTimeout": 60000,
+                "sendTimeout": 60000,
+                "nextTries": 3,
+                "nextTimeout": 0,
+                "nextCases": ["error", "timeout"]
             }
 
-            if "to" in expose:
-                for to_config in expose["to"]:
-                    if isinstance(to_config, dict):
-                        if to_config.get("global"):
-                            expose_entry["global"] = True
+            custom_http_options = expose.get("http_options", {})
+            http_options = {
+                "maxBodySize": custom_http_options.get("max_body_size", http_options_defaults["maxBodySize"]),
+                "readTimeout": custom_http_options.get("read_timeout", http_options_defaults["readTimeout"]),
+                "sendTimeout": custom_http_options.get("send_timeout", http_options_defaults["sendTimeout"]),
+                "nextTries": custom_http_options.get("next_tries", http_options_defaults["nextTries"]),
+                "nextTimeout": custom_http_options.get("next_timeout", http_options_defaults["nextTimeout"]),
+                "nextCases": custom_http_options.get("next_cases", http_options_defaults["nextCases"])
+            }
 
-                        if "service" in to_config:
-                            expose_entry["service"] = to_config["service"]
+            hosts = expose.get("accept") or None
 
-                        if "ip" in to_config and endpoint_sequence_numbers:
-                            ip_name = to_config["ip"]
-                            expose_entry["ip"] = ip_name
-                            expose_entry["endpointSequenceNumber"] = endpoint_sequence_numbers.get(ip_name, 0)
+            to_list = expose.get("to", [])
+            if not to_list:
+                continue
 
-            result.append(expose_entry)
+            for to_config in to_list:
+                if not isinstance(to_config, dict):
+                    continue
+
+                expose_entry = {
+                    "port": port,
+                    "externalPort": expose.get("as") or 0,
+                    "proto": expose.get("proto", "tcp").upper(),
+                    "service": to_config.get("service", ""),
+                    "global": to_config.get("global", False),
+                    "hosts": hosts,
+                    "httpOptions": http_options,
+                    "ip": to_config.get("ip", ""),
+                    "endpointSequenceNumber": endpoint_sequence_numbers.get(to_config.get("ip", ""), 0)
+                }
+
+                result.append(expose_entry)
+
+        result.sort(key=lambda e: (
+            e["service"],
+            e["port"],
+            e["proto"],
+            not e["global"]
+        ))
 
         return result
 

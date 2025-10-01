@@ -1139,7 +1139,6 @@ class DeploymentUtils:
 
                 service_def = services.get(profile_name, {})
                 expose_list = service_def.get("expose", [])
-                has_global_endpoints = self._has_global_endpoints(expose_list)
 
                 resources = compute_profile.get("resources", {})
                 storage_config = resources.get("storage", {})
@@ -1151,6 +1150,7 @@ class DeploymentUtils:
                     'storage': self._build_storage_volumes(storage_config),
                     'gpu': self._parse_gpu_config(gpu_config),
                     'price': pricing.get("amount"),
+                    'price_denom': pricing.get("denom", "uakt"),
                     'count': placement_spec.get("count")
                 }
 
