@@ -2294,6 +2294,152 @@ deployment:
         assert version_hex == expected_version_hex
         assert version_base64 == expected_version_base64
 
+    def test_manifest_version_multi_endpoint(self):
+        """Test manifest version calculation for SDL with multiple endpoints."""
+        import hashlib
+        import json
+        import base64
+        from akash.modules.manifest.utils import ManifestUtils
+
+        sdl = '''
+version: "2.0"
+services:
+  game-server:
+    image: nginx:alpine
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+      - port: 12345
+        as: 12345
+        proto: udp
+        to:
+          - global: true
+    env:
+      - SERVER_MODE=multi-protocol
+      - HTTP_PORT=80
+      - UDP_PORT=12345
+    command:
+      - "sh"
+      - "-c"
+    args:
+      - |
+        echo "<html><body><h1>Multi-Protocol Server</h1><p>HTTP: Port 80 (TCP)</p><p>UDP: Port 12345</p></body></html>" > /usr/share/nginx/html/index.html
+        nginx -g "daemon off;"
+profiles:
+  compute:
+    game-server:
+      resources:
+        cpu:
+          units: 0.5
+        memory:
+          size: 512Mi
+        storage:
+          size: 1Gi
+  placement:
+    global:
+      attributes:
+        host: akash
+      pricing:
+        game-server:
+          denom: uakt
+          amount: 10000
+deployment:
+  game-server:
+    global:
+      profile: game-server
+      count: 1
+'''
+
+        expected_version_hex = "6a556eea1c1ce239ee70ba77739dce449a027147eb6e76d596e060d9822b45ae"
+        expected_version_base64 = "alVu6hwc4jnucLp3c53ORJoCcUfrbnbVluBg2YIrRa4="
+
+        manifest_utils = ManifestUtils()
+        parse_result = manifest_utils.parse_sdl(sdl)
+        assert parse_result.get('status') == 'success'
+
+        manifest_data = parse_result.get('manifest_data', [])
+        legacy_manifest = manifest_utils._create_legacy_manifest(manifest_data)
+        manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+        manifest_json = manifest_utils._escape_html(manifest_json)
+
+        version_bytes = hashlib.sha256(manifest_json.encode()).digest()
+        version_base64 = base64.b64encode(version_bytes).decode('utf-8')
+        version_hex = hashlib.sha256(manifest_json.encode()).hexdigest()
+
+        assert version_hex == expected_version_hex
+        assert version_base64 == expected_version_base64
+
+    def test_manifest_version_ip_lease(self):
+        """Test manifest version calculation for SDL with ip lease."""
+        import hashlib
+        import json
+        import base64
+        from akash.modules.manifest.utils import ManifestUtils
+
+        sdl = '''
+version: "2.0"
+
+endpoints:
+  myendpoint:
+    kind: ip
+
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+            ip: "myendpoint"
+
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.5
+        memory:
+          size: 512Mi
+        storage:
+          size: 1Gi
+  placement:
+    global:
+      attributes:
+        host: akash
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+
+deployment:
+  web:
+    global:
+      profile: web
+      count: 1
+'''
+
+        expected_version_hex = "cb12db433087f2382e488abafa6103d976552a1df52350aeda47f153d8d9493c"
+        expected_version_base64 = "yxLbQzCH8jguSIq6+mED2XZVKh31I1Cu2kfxU9jZSTw="
+
+        manifest_utils = ManifestUtils()
+        parse_result = manifest_utils.parse_sdl(sdl)
+        assert parse_result.get('status') == 'success'
+
+        manifest_data = parse_result.get('manifest_data', [])
+        legacy_manifest = manifest_utils._create_legacy_manifest(manifest_data)
+        manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+        manifest_json = manifest_utils._escape_html(manifest_json)
+
+        version_bytes = hashlib.sha256(manifest_json.encode()).digest()
+        version_base64 = base64.b64encode(version_bytes).decode('utf-8')
+        version_hex = hashlib.sha256(manifest_json.encode()).hexdigest()
+
+        assert version_hex == expected_version_hex
+        assert version_base64 == expected_version_base64
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

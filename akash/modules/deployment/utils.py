@@ -578,15 +578,7 @@ class DeploymentUtils:
             endpoints_specs = []
             if "endpoints" in resource_data:
                 for endpoint in resource_data["endpoints"]:
-                    kind = endpoint.get("kind", "SHARED_HTTP")
-                    if isinstance(kind, str):
-                        kind_map = {
-                            "SHARED_HTTP": 0,
-                            "RANDOM_PORT": 1,
-                            "LEASED_IP": 2
-                        }
-                        kind = kind_map.get(kind, 0)
-
+                    kind = endpoint.get("kind", 0)
                     endpoint_spec = {
                         "kind": kind,
                         "sequence_number": endpoint.get("sequence_number", 0)
@@ -1130,6 +1122,8 @@ class DeploymentUtils:
         profiles = sdl_data.get("profiles", {})
         services = sdl_data.get("services", {})
 
+        endpoint_sequence_numbers = self._compute_endpoint_sequence_numbers(sdl_data)
+
         for deployment_name, deployment_spec in deployment_config.items():
             for placement_name, placement_spec in deployment_spec.items():
                 profile_name = placement_spec.get("profile")
@@ -1160,10 +1154,7 @@ class DeploymentUtils:
                     'count': placement_spec.get("count")
                 }
 
-                if has_global_endpoints:
-                    group_resource['endpoints'] = [{'sequence_number': 0}]
-                else:
-                    group_resource['endpoints'] = []
+                group_resource['endpoints'] = self._build_endpoints_from_expose(expose_list, endpoint_sequence_numbers)
 
                 requirements_attrs = []
                 if "attributes" in placement_profile:
@@ -1199,6 +1190,76 @@ class DeploymentUtils:
                     if isinstance(to_config, dict) and to_config.get("global"):
                         return True
         return False
+
+    def _compute_endpoint_sequence_numbers(self, sdl_data: Dict) -> Dict[str, int]:
+        """
+        Compute sequence numbers for IP endpoints.
+
+        Returns a dict mapping IP endpoint names to their sequence numbers (starting from 1).
+        """
+        ip_names = set()
+        services = sdl_data.get("services", {})
+
+        for service_name, service_def in services.items():
+            expose_list = service_def.get("expose", [])
+            for expose in expose_list:
+                to_configs = expose.get("to", [])
+                for to_config in to_configs:
+                    if isinstance(to_config, dict) and to_config.get("global") and to_config.get("ip"):
+                        ip_names.add(to_config["ip"])
+
+        sorted_ips = sorted(ip_names)
+        return {ip_name: idx + 1 for idx, ip_name in enumerate(sorted_ips)}
+
+    def _build_endpoints_from_expose(self, expose_list: list, endpoint_sequence_numbers: dict = None) -> list:
+        """
+        Build endpoints array from expose configuration.
+
+        Endpoint kinds:
+        - 0 (SHARED_HTTP): TCP on port 80 with global
+        - 1 (RANDOM_PORT): Other protocols/ports with global
+        - 2 (LEASED_IP): IP endpoints
+
+        Args:
+            expose_list: List of expose configurations from SDL
+            endpoint_sequence_numbers: Dict mapping IP endpoint names to sequence numbers
+        """
+        endpoints = []
+        if endpoint_sequence_numbers is None:
+            endpoint_sequence_numbers = {}
+
+        for expose in expose_list:
+            if "to" not in expose:
+                continue
+
+            port = expose.get("port", 0)
+            external_port = expose.get("as", 0)
+            proto = expose.get("proto", "tcp").upper()
+
+            actual_external_port = external_port if external_port != 0 else port
+
+            for to_config in expose["to"]:
+                if not isinstance(to_config, dict):
+                    continue
+
+                if not to_config.get("global"):
+                    continue
+
+                is_ingress = proto == "TCP" and actual_external_port == 80
+
+                if is_ingress:
+                    endpoint = {"sequence_number": 0}
+                else:
+                    endpoint = {"kind": 1, "sequence_number": 0}
+
+                endpoints.append(endpoint)
+
+                if to_config.get("ip"):
+                    ip_name = to_config["ip"]
+                    sequence_number = endpoint_sequence_numbers.get(ip_name, 0)
+                    endpoints.append({"kind": 2, "sequence_number": sequence_number})
+
+        return endpoints
 
     def _parse_cpu_to_millis(self, cpu_value) -> str:
         """Convert CPU value to millicpu string."""

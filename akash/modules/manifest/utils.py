@@ -222,8 +222,8 @@ class ManifestUtils:
             "gpu": self._build_gpu(compute_profile.get("resources", {}).get("gpu", {}))
         }
 
-        if service_def and endpoint_sequence_numbers:
-            endpoints = self._build_service_endpoints(service_def, endpoint_sequence_numbers)
+        if service_def:
+            endpoints = self._build_service_endpoints(service_def, endpoint_sequence_numbers or {})
             resources["endpoints"] = endpoints if endpoints else []
         elif has_global_endpoints:
             resources["endpoints"] = [{"sequence_number": 0}]
@@ -592,28 +592,49 @@ class ManifestUtils:
             return {"valid": False, "error": f"Endpoint usage validation error: {str(e)}"}
 
     def _compute_endpoint_sequence_numbers(self, services: Dict, endpoints: Dict) -> Dict[str, int]:
-        """Compute endpoint sequence numbers for IP endpoints."""
-        sequence_numbers = {}
-        current_sequence = 1
+        """
+        Compute endpoint sequence numbers for IP endpoints.
+        """
+        ip_names = set()
 
-        for endpoint_name in endpoints.keys():
-            sequence_numbers[endpoint_name] = current_sequence
-            current_sequence += 1
+        for service_name, service_def in services.items():
+            expose_list = service_def.get("expose", [])
+            for expose in expose_list:
+                to_configs = expose.get("to", [])
+                for to_config in to_configs:
+                    if isinstance(to_config, dict) and to_config.get("global") and to_config.get("ip"):
+                        ip_names.add(to_config["ip"])
 
-        return sequence_numbers
+        sorted_ips = sorted(ip_names)
+        return {ip_name: idx + 1 for idx, ip_name in enumerate(sorted_ips)}
 
     def _build_service_endpoints(self, service_def: Dict, endpoint_sequence_numbers: Dict) -> List[Dict]:
-        """Build service endpoints for resources section."""
+        """
+        Build service endpoints for resources section.
+        """
         endpoints = []
         expose_list = service_def.get("expose", [])
 
         for expose in expose_list:
+            port = expose.get("port", 0)
+            external_port = expose.get("as", 0)
+            proto = expose.get("proto", "tcp").upper()
+            actual_external_port = external_port if external_port != 0 else port
+
             to_list = expose.get("to", [])
             for to_config in to_list:
-                if isinstance(to_config, dict):
-                    if to_config.get("global") and "ip" not in to_config:
-                        endpoints.append({"kind": 0, "sequence_number": 0})
-                    elif "ip" in to_config:
+                if not isinstance(to_config, dict):
+                    continue
+
+                if to_config.get("global"):
+                    is_ingress = proto == "TCP" and actual_external_port == 80
+
+                    if is_ingress:
+                        endpoints.append({"sequence_number": 0})
+                    else:
+                        endpoints.append({"kind": 1, "sequence_number": 0})
+
+                    if "ip" in to_config:
                         ip_name = to_config["ip"]
                         sequence_number = endpoint_sequence_numbers.get(ip_name, 0)
                         endpoints.append({"kind": 2, "sequence_number": sequence_number})
@@ -621,7 +642,7 @@ class ManifestUtils:
         seen = set()
         unique_endpoints = []
         for endpoint in endpoints:
-            key = (endpoint["kind"], endpoint["sequence_number"])
+            key = tuple(sorted(endpoint.items()))
             if key not in seen:
                 seen.add(key)
                 unique_endpoints.append(endpoint)
@@ -1058,7 +1079,7 @@ class ManifestUtils:
                 provider_endpoint, lease_id, sdl_content, cert_pem, key_pem, provider_version
             )
         else:
-            logger.info(f"Modern provider detected (v{provider_version}) - using standard approach")
+            logger.info(f"Modern provider detected (v{provider_version}) - using legacy format for version hash compatibility")
             result = self.parse_sdl(sdl_content)
             if result.get('status') != 'success':
                 return {
@@ -1067,7 +1088,9 @@ class ManifestUtils:
                     "provider_version": provider_version
                 }
 
-            manifest_data = result.get('manifest_data')
+            parsed_manifest_data = result.get('manifest_data', [])
+            manifest_data = self._create_legacy_manifest(parsed_manifest_data)
+
             return self._send_manifest_http(
                 provider_endpoint, lease_id, manifest_data, cert_pem, key_pem, timeout
             )
@@ -1112,11 +1135,6 @@ class ManifestUtils:
                     logger.info("Modern provider - will use mtls. prefix for authentication")
 
             manifest_json = self._create_manifest_json(manifest_data)
-
-            if adaptive and provider_version and self._is_legacy_provider(provider_version):
-                manifest_json = manifest_json.replace('"quantity":', '"size":')
-                logger.info("Converted quantity fields to size fields for legacy provider")
-
             manifest_hash = self._calculate_manifest_version(manifest_json)
             logger.info(f"Manifest hash: {manifest_hash.hex()}")
             logger.info(f"Manifest JSON (first 500 chars): {manifest_json[:500]}")
