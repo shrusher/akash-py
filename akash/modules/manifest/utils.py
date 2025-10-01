@@ -5,7 +5,12 @@ import yaml
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional
 
-from ...grpc_client import ProviderGRPCClient
+try:
+    import urllib3
+
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+except:
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +154,8 @@ class ManifestUtils:
                         expose_list = service_def.get("expose", [])
                         has_global_endpoints = self._has_global_endpoints(expose_list)
 
-                        resources = self._build_resources(compute_profile, has_global_endpoints, service_def, endpoint_sequence_numbers)
+                        resources = self._build_resources(compute_profile, has_global_endpoints, service_def,
+                                                          endpoint_sequence_numbers)
                         storage_names = [s["name"] for s in resources["storage"]]
 
                         credentials = self._build_credentials(service_def.get("credentials"), service_name)
@@ -188,7 +194,8 @@ class ManifestUtils:
             logger.error(f"SDL parsing failed: {e}")
             return {"status": "failed", "error": str(e)}
 
-    def _build_resources(self, compute_profile: Dict, has_global_endpoints: bool = False, service_def: Dict = None, endpoint_sequence_numbers: Dict = None) -> Dict:
+    def _build_resources(self, compute_profile: Dict, has_global_endpoints: bool = False, service_def: Dict = None,
+                         endpoint_sequence_numbers: Dict = None) -> Dict:
         """Build resources section."""
 
         cpu_units = compute_profile.get("resources", {}).get("cpu", {}).get("units")
@@ -217,10 +224,11 @@ class ManifestUtils:
 
         if service_def and endpoint_sequence_numbers:
             endpoints = self._build_service_endpoints(service_def, endpoint_sequence_numbers)
-            if endpoints:
-                resources["endpoints"] = endpoints
+            resources["endpoints"] = endpoints if endpoints else []
         elif has_global_endpoints:
             resources["endpoints"] = [{"sequence_number": 0}]
+        else:
+            resources["endpoints"] = []
 
         return resources
 
@@ -267,6 +275,9 @@ class ManifestUtils:
                         if to_config.get("global"):
                             expose_entry["global"] = True
 
+                        if "service" in to_config:
+                            expose_entry["service"] = to_config["service"]
+
                         if "ip" in to_config and endpoint_sequence_numbers:
                             ip_name = to_config["ip"]
                             expose_entry["ip"] = ip_name
@@ -305,7 +316,8 @@ class ManifestUtils:
             storage_list = []
             for name, config in storage_params.items():
                 if name not in storage_names:
-                    raise ValueError(f"Storage '{name}' referenced in service params but not defined in compute profile")
+                    raise ValueError(
+                        f"Storage '{name}' referenced in service params but not defined in compute profile")
 
                 storage_entry = {
                     "name": name,
@@ -359,13 +371,16 @@ class ManifestUtils:
         return result
 
     def _build_storage_attributes(self, attributes: Dict) -> List[Dict]:
-        """Build storage attributes with intelligent defaults and validation."""
+        """Build storage attributes with validation."""
         if not attributes:
             return []
 
         pairs = []
         for key, value in attributes.items():
-            pairs.append({"key": key, "value": str(value)})
+            if isinstance(value, bool):
+                pairs.append({"key": key, "value": str(value).lower()})
+            else:
+                pairs.append({"key": key, "value": str(value)})
 
         if attributes.get("class") == "ram" and "persistent" not in attributes:
             pairs.append({"key": "persistent", "value": "false"})
@@ -851,7 +866,9 @@ class ManifestUtils:
                     },
                     "gpu": {
                         "units": {"val": str(resources.get("gpu", {}).get("units", {}).get("val", "0"))},
-                        **({"attributes": resources.get("gpu", {}).get("attributes", [])} if resources.get("gpu", {}).get("attributes") else {})
+                        **({"attributes": resources.get("gpu", {}).get("attributes", [])} if resources.get("gpu",
+                                                                                                           {}).get(
+                            "attributes") else {})
                     },
                     "storage": []
                 }
@@ -873,6 +890,8 @@ class ManifestUtils:
                 has_global = any(exp.get("global", False) for exp in expose_list)
                 if has_global:
                     legacy_resources["endpoints"] = [{"sequence_number": 0}]
+                else:
+                    legacy_resources["endpoints"] = []
 
                 legacy_expose = []
                 for expose in expose_list:
@@ -882,22 +901,18 @@ class ManifestUtils:
                         "proto": expose.get("proto", "TCP"),
                         "global": expose.get("global", False),
                         "hosts": expose.get("hosts"),
+                        "httpOptions": expose.get("httpOptions", {
+                            "maxBodySize": 1048576,
+                            "nextCases": ["error", "timeout"],
+                            "nextTimeout": 0,
+                            "nextTries": 3,
+                            "readTimeout": 60000,
+                            "sendTimeout": 60000
+                        }),
                         "service": expose.get("service", ""),
-                        "ip": expose.get("ip", "")
+                        "ip": expose.get("ip", ""),
+                        "endpointSequenceNumber": expose.get("endpointSequenceNumber", 0)
                     }
-
-                    if expose.get("global"):
-                        legacy_exp["endpointSequenceNumber"] = expose.get("endpointSequenceNumber", 0)
-
-                        if expose.get("port") in [80, 443, 8080]:
-                            legacy_exp["httpOptions"] = expose.get("httpOptions", {
-                                "maxBodySize": 1048576,
-                                "nextCases": ["error", "timeout"],
-                                "nextTimeout": 0,
-                                "nextTries": 3,
-                                "readTimeout": 60000,
-                                "sendTimeout": 60000
-                            })
 
                     legacy_expose.append(legacy_exp)
 
@@ -980,7 +995,6 @@ class ManifestUtils:
         """
         hash_obj = hashlib.sha256(manifest_json.encode('utf-8'))
         return hash_obj.digest()
-
 
     def _sort_json_deterministic(self, json_str: str) -> str:
         """Sort JSON with deterministic ordering and HTML escaping."""
@@ -1070,21 +1084,32 @@ class ManifestUtils:
     ) -> Dict[str, Any]:
         """
         Send manifest to provider via HTTP PUT with adaptive provider support.
+
+        For modern providers (v0.7+), uses the mtls. prefix convention to signal
+        mTLS authentication intent via SNI.
         """
         try:
             import requests
             import tempfile
             import os
+            import ssl
+            import socket
+            from urllib.parse import urlparse
 
             logger.info(f"Sending manifest via HTTP to {provider_endpoint}")
 
             provider_version = "unknown"
+            is_modern_provider = False
+
             if adaptive:
                 provider_version = self._detect_provider_version(provider_endpoint)
                 logger.info(f"Detected provider version: {provider_version}")
 
                 if self._is_legacy_provider(provider_version):
                     logger.info("Legacy provider - will convert quantity to size fields")
+                else:
+                    is_modern_provider = True
+                    logger.info("Modern provider - will use mtls. prefix for authentication")
 
             manifest_json = self._create_manifest_json(manifest_data)
 
@@ -1097,22 +1122,167 @@ class ManifestUtils:
             logger.info(f"Manifest JSON (first 500 chars): {manifest_json[:500]}")
 
             dseq = lease_id.get("dseq")
-            url = f"{provider_endpoint.rstrip('/')}/deployment/{dseq}/manifest"
+            path = f"/deployment/{dseq}/manifest"
 
-            headers = {
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "Content-Length": str(len(manifest_json))
-            }
+            parsed_uri = urlparse(provider_endpoint)
+            hostname = parsed_uri.hostname
+            port = parsed_uri.port or 8443
 
-            kwargs = {
-                "url": url,
-                "data": manifest_json,
-                "headers": headers,
-                "timeout": timeout,
-            }
+            use_socket_approach = False
+            socket_cert_file = None
+            socket_key_file = None
 
-            if cert_pem and key_pem:
+            if cert_pem and key_pem and is_modern_provider:
+                logger.info(f"Attempting socket-based approach with mtls. prefix: mtls.{hostname}")
+
+                socket_cert_file = tempfile.NamedTemporaryFile(mode="w", suffix=".crt", delete=False)
+                socket_key_file = tempfile.NamedTemporaryFile(mode="w", suffix=".key", delete=False)
+
+                try:
+                    socket_cert_file.write(cert_pem)
+                    socket_cert_file.flush()
+                    socket_key_file.write(key_pem)
+                    socket_key_file.flush()
+
+                    ctx = ssl.create_default_context()
+                    ctx.check_hostname = False
+                    ctx.verify_mode = ssl.CERT_NONE
+
+                    try:
+                        ctx.load_cert_chain(socket_cert_file.name, socket_key_file.name)
+                        use_socket_approach = True
+                    except ssl.SSLError as ssl_err:
+                        logger.debug(f"Failed to load certificate chain: {ssl_err}, falling back to requests library")
+                        socket_cert_file.close()
+                        socket_key_file.close()
+                        os.unlink(socket_cert_file.name)
+                        os.unlink(socket_key_file.name)
+                        socket_cert_file = None
+                        socket_key_file = None
+                        use_socket_approach = False
+                except Exception as e:
+                    logger.debug(f"Failed to prepare socket approach: {e}, falling back to requests library")
+                    if socket_cert_file:
+                        socket_cert_file.close()
+                        os.unlink(socket_cert_file.name)
+                    if socket_key_file:
+                        socket_key_file.close()
+                        os.unlink(socket_key_file.name)
+                    socket_cert_file = None
+                    socket_key_file = None
+                    use_socket_approach = False
+
+            if use_socket_approach:
+                try:
+                    sock = socket.create_connection((hostname, port), timeout=timeout)
+                    ssl_sock = ctx.wrap_socket(sock, server_hostname=f"mtls.{hostname}")
+
+                    request_str = (
+                        f"PUT {path} HTTP/1.1\r\n"
+                        f"Host: {hostname}\r\n"
+                        f"Content-Type: application/json\r\n"
+                        f"Accept: application/json\r\n"
+                        f"Content-Length: {len(manifest_json)}\r\n"
+                        f"\r\n"
+                        f"{manifest_json}"
+                    )
+                    ssl_sock.sendall(request_str.encode())
+
+                    ssl_sock.settimeout(timeout)
+                    response_data = b""
+                    socket_error = None
+                    try:
+                        while len(response_data) < 1048576:  # 1MB max
+                            try:
+                                chunk = ssl_sock.recv(4096)
+                                if not chunk:
+                                    break
+                                response_data += chunk
+
+                                if b"\r\n\r\n" in response_data:
+                                    parts = response_data.split(b"\r\n\r\n", 1)
+                                    headers = parts[0].decode('utf-8', errors='ignore')
+
+                                    content_length = None
+                                    for line in headers.split("\r\n"):
+                                        if line.lower().startswith("content-length:"):
+                                            content_length = int(line.split(":", 1)[1].strip())
+                                            break
+
+                                    if content_length is not None:
+                                        body = parts[1] if len(parts) > 1 else b""
+                                        if len(body) >= content_length:
+                                            break
+                                    elif "204" in headers or content_length == 0:
+                                        break
+                            except socket.timeout:
+                                logger.debug("Socket timeout while reading response, using data received so far")
+                                socket_error = "Socket timeout"
+                                break
+                            except ssl.SSLError as e:
+                                logger.debug(f"SSL error while reading response: {e}")
+                                socket_error = f"SSL error: {str(e)}"
+                                break
+                            except Exception as e:
+                                logger.debug(f"Error reading from socket: {e}, using data received so far")
+                                socket_error = str(e)
+                                break
+                    finally:
+                        ssl_sock.close()
+
+                    response_str = response_data.decode('utf-8', errors='ignore')
+                    if not response_str:
+                        if socket_error:
+                            raise Exception(f"No response from provider ({socket_error})")
+                        else:
+                            raise Exception("Empty response from provider")
+
+                    lines = response_str.split("\r\n")
+                    status_line = lines[0]
+                    status_code = int(status_line.split()[1])
+
+                    response_body = ""
+                    if "\r\n\r\n" in response_str:
+                        response_body = response_str.split("\r\n\r\n", 1)[1]
+
+                    if status_code in [200, 201, 202, 204]:
+                        logger.info(f"Manifest submission successful: {status_code}")
+                        return {
+                            "status": "success",
+                            "provider": provider_endpoint,
+                            "lease_id": lease_id,
+                            "method": "HTTP (socket-based)",
+                            "status_code": status_code,
+                            "provider_version": provider_version,
+                        }
+                    else:
+                        error_msg = response_body[:500] if response_body else f"HTTP {status_code}"
+                        logger.error(f"Manifest submission failed: {error_msg}")
+                        return {
+                            "status": "error",
+                            "error": error_msg,
+                            "provider": provider_endpoint,
+                            "method": "HTTP (socket-based)",
+                            "status_code": status_code,
+                            "provider_version": provider_version,
+                        }
+                finally:
+                    if socket_cert_file:
+                        socket_cert_file.close()
+                        os.unlink(socket_cert_file.name)
+                    if socket_key_file:
+                        socket_key_file.close()
+                        os.unlink(socket_key_file.name)
+
+            elif cert_pem and key_pem:
+                url = f"{provider_endpoint.rstrip('/')}{path}"
+
+                headers = {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "Content-Length": str(len(manifest_json))
+                }
+
                 cert_file = tempfile.NamedTemporaryFile(mode="w", suffix=".crt", delete=False)
                 key_file = tempfile.NamedTemporaryFile(mode="w", suffix=".key", delete=False)
 
@@ -1122,13 +1292,36 @@ class ManifestUtils:
                     key_file.write(key_pem)
                     key_file.flush()
 
-                    kwargs["cert"] = (cert_file.name, key_file.name)
-                    kwargs["verify"] = False
+                    response = requests.put(
+                        url,
+                        data=manifest_json,
+                        headers=headers,
+                        timeout=timeout,
+                        cert=(cert_file.name, key_file.name),
+                        verify=False
+                    )
 
-                    import urllib3
-                    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-                    response = requests.put(**kwargs)
+                    if response.status_code in [200, 201, 202, 204]:
+                        logger.info(f"Manifest submission successful: {response.status_code}")
+                        return {
+                            "status": "success",
+                            "provider": provider_endpoint,
+                            "lease_id": lease_id,
+                            "method": "HTTP",
+                            "status_code": response.status_code,
+                            "provider_version": provider_version if adaptive else "unknown",
+                        }
+                    else:
+                        error_msg = response.text[:500] if response.text else f"HTTP {response.status_code}"
+                        logger.error(f"Manifest submission failed: {error_msg}")
+                        return {
+                            "status": "error",
+                            "error": error_msg,
+                            "provider": provider_endpoint,
+                            "method": "HTTP",
+                            "status_code": response.status_code,
+                            "provider_version": provider_version if adaptive else "unknown",
+                        }
 
                 finally:
                     cert_file.close()
@@ -1136,29 +1329,42 @@ class ManifestUtils:
                     os.unlink(cert_file.name)
                     os.unlink(key_file.name)
             else:
-                response = requests.put(**kwargs)
+                url = f"{provider_endpoint.rstrip('/')}{path}"
 
-            if response.status_code in [200, 201, 202, 204]:
-                logger.info(f"Manifest submission successful: {response.status_code}")
-                return {
-                    "status": "success",
-                    "provider": provider_endpoint,
-                    "lease_id": lease_id,
-                    "method": "HTTP",
-                    "status_code": response.status_code,
-                    "provider_version": provider_version if adaptive else "unknown",
+                headers = {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "Content-Length": str(len(manifest_json))
                 }
-            else:
-                error_msg = response.text[:500] if response.text else f"HTTP {response.status_code}"
-                logger.error(f"Manifest submission failed: {error_msg}")
-                return {
-                    "status": "error",
-                    "error": error_msg,
-                    "provider": provider_endpoint,
-                    "method": "HTTP",
-                    "status_code": response.status_code,
-                    "provider_version": provider_version if adaptive else "unknown",
-                }
+
+                response = requests.put(
+                    url,
+                    data=manifest_json,
+                    headers=headers,
+                    timeout=timeout
+                )
+
+                if response.status_code in [200, 201, 202, 204]:
+                    logger.info(f"Manifest submission successful: {response.status_code}")
+                    return {
+                        "status": "success",
+                        "provider": provider_endpoint,
+                        "lease_id": lease_id,
+                        "method": "HTTP",
+                        "status_code": response.status_code,
+                        "provider_version": provider_version if adaptive else "unknown",
+                    }
+                else:
+                    error_msg = response.text[:500] if response.text else f"HTTP {response.status_code}"
+                    logger.error(f"Manifest submission failed: {error_msg}")
+                    return {
+                        "status": "error",
+                        "error": error_msg,
+                        "provider": provider_endpoint,
+                        "method": "HTTP",
+                        "status_code": response.status_code,
+                        "provider_version": provider_version if adaptive else "unknown",
+                    }
 
         except Exception as e:
             logger.error(f"Failed to send manifest via HTTP: {e}")
@@ -1168,7 +1374,6 @@ class ManifestUtils:
                 "provider": provider_endpoint,
                 "method": "HTTP",
             }
-
 
     def validate_manifest(self, manifest_data: Dict[str, Any]) -> Dict[str, Any]:
         """Basic manifest validation."""

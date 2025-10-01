@@ -5,15 +5,91 @@ from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CPU_NANOCPUS = "100000000"
-DEFAULT_MEMORY_BYTES = "268435456"
-DEFAULT_STORAGE_BYTES = "1073741824"
-
 
 class DeploymentUtils:
     """
     Mixin for deployment utilities.
     """
+
+    def _get_storage_size(self, storage_config) -> str:
+        """
+        Extract storage size from storage config.
+        Storage can be either a dict with 'size' key or a list of storage volumes.
+
+        Args:
+            storage_config: Storage configuration (dict or list)
+
+        Returns:
+            str: Storage size (e.g., "512Mi", "1Gi")
+
+        Raises:
+            ValueError: If storage config is invalid or missing required 'size' field
+        """
+        if isinstance(storage_config, dict):
+            if "size" not in storage_config:
+                raise ValueError("Storage config missing required 'size' field")
+            return storage_config["size"]
+        elif isinstance(storage_config, list):
+            if not storage_config:
+                raise ValueError("Storage config is an empty list")
+
+            for item in storage_config:
+                if isinstance(item, dict) and "name" not in item:
+                    if "size" not in item:
+                        raise ValueError(f"Storage volume missing required 'size' field: {item}")
+                    return item["size"]
+
+            if isinstance(storage_config[0], dict):
+                if "size" not in storage_config[0]:
+                    raise ValueError(f"Storage volume missing required 'size' field: {storage_config[0]}")
+                return storage_config[0]["size"]
+
+            raise ValueError(f"Invalid storage config format: {storage_config}")
+        else:
+            raise ValueError(f"Invalid storage config type: {type(storage_config)}, expected dict or list")
+
+    def _build_storage_volumes(self, storage_config) -> List[Dict]:
+        """
+        Build storage volumes array from SDL storage config.
+        Handles both single storage (dict) and multiple volumes (list).
+
+        Args:
+            storage_config: Storage configuration from SDL (dict or list)
+
+        Returns:
+            List of storage volume objects with name, size, and attributes
+        """
+        volumes = []
+
+        if isinstance(storage_config, dict):
+            volumes.append({
+                "name": "default",
+                "size": self._parse_storage_to_bytes(storage_config["size"]),
+                "attributes": {}
+            })
+        elif isinstance(storage_config, list):
+            for item in storage_config:
+                if not isinstance(item, dict):
+                    raise ValueError(f"Storage item must be a dict, got {type(item)}")
+
+                if "size" not in item:
+                    raise ValueError(f"Storage volume missing required 'size' field: {item}")
+
+                name = item.get("name", "default")
+
+                size_bytes = self._parse_storage_to_bytes(item["size"])
+
+                attributes = item.get("attributes", {})
+
+                volumes.append({
+                    "name": name,
+                    "size": size_bytes,
+                    "attributes": attributes
+                })
+        else:
+            raise ValueError(f"Storage config must be a dict or list, got {type(storage_config)}")
+
+        return volumes
 
     def _safe_decode_bytes(self, bytes_data: bytes) -> str:
         """
@@ -73,10 +149,11 @@ class DeploymentUtils:
             resources_info = {}
             for service_name, profile in compute_profiles.items():
                 resources = profile.get("resources", {})
+                storage_config = resources.get("storage", {})
                 resources_info[service_name] = {
                     "cpu": resources.get("cpu", {}).get("units", "N/A"),
                     "memory": resources.get("memory", {}).get("size", "N/A"),
-                    "storage": resources.get("storage", {}).get("size", "N/A"),
+                    "storage": self._get_storage_size(storage_config),
                 }
 
                 cpu_units = resources.get("cpu", {}).get("units", "0")
@@ -230,7 +307,7 @@ class DeploymentUtils:
                                     resources_config.get("memory", {}).get("size")
                                 ),
                                 "storage": self._parse_storage_size(
-                                    resources_config.get("storage", {}).get("size")
+                                    self._get_storage_size(resources_config.get("storage", {}))
                                 ),
                                 "price": pricing.get("amount"),
                                 "count": placement_config.get("count"),
@@ -254,6 +331,9 @@ class DeploymentUtils:
 
         Returns:
             str: CPU units in nanocpus
+
+        Raises:
+            ValueError: If cpu_str is invalid or cannot be parsed
         """
         try:
             if isinstance(cpu_str, str):
@@ -263,8 +343,8 @@ class DeploymentUtils:
 
             nanocpus = int(cpu_value * 1_000_000_000)
             return str(nanocpus)
-        except (ValueError, TypeError):
-            return DEFAULT_CPU_NANOCPUS
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid CPU units specification: {cpu_str!r}") from e
 
     def _parse_memory_size(self, memory_str: str) -> str:
         """Convert memory specification to bytes.
@@ -274,6 +354,9 @@ class DeploymentUtils:
 
         Returns:
             str: Memory size in bytes
+
+        Raises:
+            ValueError: If memory_str is invalid or cannot be parsed
         """
         try:
             if "Mi" in memory_str:
@@ -284,8 +367,8 @@ class DeploymentUtils:
                 return str(value * 1024 * 1024 * 1024)
             else:
                 return str(int(memory_str))
-        except (ValueError, TypeError):
-            return DEFAULT_MEMORY_BYTES
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid memory size specification: {memory_str!r}") from e
 
     def _parse_storage_size(self, storage_str: str) -> str:
         """Convert storage specification to bytes.
@@ -295,6 +378,9 @@ class DeploymentUtils:
 
         Returns:
             str: Storage size in bytes
+
+        Raises:
+            ValueError: If storage_str is invalid or cannot be parsed
         """
         try:
             if "Gi" in storage_str:
@@ -305,8 +391,8 @@ class DeploymentUtils:
                 return str(value * 1024 * 1024)
             else:
                 return str(int(storage_str))
-        except (ValueError, TypeError):
-            return DEFAULT_STORAGE_BYTES
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid storage size specification: {storage_str!r}") from e
 
     def _group_spec_to_dict(self, group_data: dict) -> dict:
         """
@@ -345,11 +431,28 @@ class DeploymentUtils:
                 for storage in resource_data["storage"]:
                     if "name" not in storage or "size" not in storage:
                         raise ValueError("Storage must have 'name' and 'size' fields")
+
+                    attributes_list = []
+                    if "attributes" in storage and isinstance(storage["attributes"], dict):
+                        attrs = storage["attributes"]
+
+                        if attrs.get("class") == "ram" and "persistent" not in attrs:
+                            attrs = dict(attrs)
+                            attrs["persistent"] = "false"
+
+                        for key, value in attrs.items():
+                            attributes_list.append({
+                                "key": key,
+                                "value": str(value).lower() if isinstance(value, bool) else str(value)
+                            })
+
+                        attributes_list.sort(key=lambda x: x["key"])
+
                     storage_specs.append(
                         {
                             "name": storage["name"],
                             "quantity": {"val": str(storage["size"])},
-                            "attributes": []
+                            "attributes": attributes_list
                         }
                     )
             else:
@@ -932,26 +1035,46 @@ class DeploymentUtils:
                 if not compute_profile:
                     continue
 
-                pricing = profiles.get("placement", {}).get(placement_name, {}).get("pricing", {}).get(profile_name, {})
+                placement_profile = profiles.get("placement", {}).get(placement_name, {})
+                pricing = placement_profile.get("pricing", {}).get(profile_name, {})
 
                 service_def = services.get(profile_name, {})
                 expose_list = service_def.get("expose", [])
-                needs_endpoints = self._has_global_endpoints(expose_list)
+                has_global_endpoints = self._has_global_endpoints(expose_list)
 
                 resources = compute_profile.get("resources", {})
+                storage_config = resources.get("storage", {})
                 group_resource = {
                     'cpu': self._parse_cpu_to_millis(resources.get("cpu", {}).get("units")),
                     'memory': self._parse_memory_to_bytes(resources.get("memory", {}).get("size")),
-                    'storage': self._parse_storage_to_bytes(resources.get("storage", {}).get("size")),
+                    'storage': self._build_storage_volumes(storage_config),
                     'price': pricing.get("amount"),
                     'count': placement_spec.get("count")
                 }
 
-                if needs_endpoints:
+                if has_global_endpoints:
                     group_resource['endpoints'] = [{'sequence_number': 0}]
+                else:
+                    group_resource['endpoints'] = []
+
+                requirements_attrs = []
+                if "attributes" in placement_profile:
+                    for key, value in placement_profile["attributes"].items():
+                        requirements_attrs.append({
+                            "key": key,
+                            "value": str(value)
+                        })
+                    requirements_attrs.sort(key=lambda x: x["key"])
 
                 groups.append({
                     'name': placement_name,
+                    'requirements': {
+                        'signed_by': {
+                            'all_of': [],
+                            'any_of': []
+                        },
+                        'attributes': requirements_attrs
+                    },
                     'resources': [group_resource]
                 })
 

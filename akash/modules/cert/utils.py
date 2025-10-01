@@ -476,35 +476,97 @@ class CertUtils:
                 logger.info("Using existing certificate from store")
                 return True, cert_info["certificate_pem"], cert_info["private_key_pem"]
 
-            existing_certs = self.get_certificates(
-                owner=wallet.address,
-                state="valid",
-                limit=1
-            )
-
             cert_path = os.path.join(self.cert_dir, "client.pem")
             key_path = os.path.join(self.cert_dir, "client-key.pem")
 
-            if (existing_certs and existing_certs.get('certificates') and
-                    os.path.exists(cert_path) and os.path.exists(key_path)):
+            if os.path.exists(cert_path) and os.path.exists(key_path):
+                try:
+                    with open(cert_path, 'r') as f:
+                        cert_pem = f.read()
+                    with open(key_path, 'r') as f:
+                        key_pem = f.read()
 
-                with open(cert_path, 'r') as f:
-                    cert_pem = f.read()
-                with open(key_path, 'r') as f:
-                    key_pem = f.read()
+                    from cryptography import x509
+                    from cryptography.hazmat.primitives import serialization
+                    import datetime
 
-                if not hasattr(self.akash_client, "_certificate_store"):
-                    self.akash_client._certificate_store = {}
+                    local_cert = x509.load_pem_x509_certificate(cert_pem.encode())
+                    local_serial = str(local_cert.serial_number)
 
-                self.akash_client._certificate_store[wallet.address] = {
-                    "certificate_pem": cert_pem,
-                    "private_key_pem": key_pem,
-                    "cert_path": cert_path,
-                    "key_path": key_path
-                }
+                    # Check expiration
+                    now = datetime.datetime.now(datetime.timezone.utc)
+                    if local_cert.not_valid_after_utc < now:
+                        logger.warning(f"Local certificate expired on {local_cert.not_valid_after_utc}")
+                        os.remove(cert_path)
+                        os.remove(key_path)
+                    elif local_cert.not_valid_before_utc > now:
+                        logger.warning(f"Local certificate not yet valid (valid from {local_cert.not_valid_before_utc})")
+                        os.remove(cert_path)
+                        os.remove(key_path)
+                    else:
+                        chain_cert_response = self.get_certificates(
+                            owner=wallet.address,
+                            serial=local_serial,
+                            state="valid"
+                        )
 
-                logger.info("Using existing certificate from files")
-                return True, cert_pem, key_pem
+                        found_on_chain = False
+                        if chain_cert_response and chain_cert_response.get('certificates'):
+                            for chain_cert in chain_cert_response['certificates']:
+                                if chain_cert['serial'] == local_serial:
+                                    found_on_chain = True
+
+                                    try:
+                                        private_key = serialization.load_pem_private_key(
+                                            key_pem.encode(),
+                                            password=None
+                                        )
+                                        local_pubkey = local_cert.public_key().public_bytes(
+                                            encoding=serialization.Encoding.DER,
+                                            format=serialization.PublicFormat.SubjectPublicKeyInfo
+                                        )
+                                        file_pubkey = private_key.public_key().public_bytes(
+                                            encoding=serialization.Encoding.DER,
+                                            format=serialization.PublicFormat.SubjectPublicKeyInfo
+                                        )
+
+                                        if local_pubkey != file_pubkey:
+                                            logger.error("Certificate and private key do not match!")
+                                            os.remove(cert_path)
+                                            os.remove(key_path)
+                                            break
+
+                                        if not hasattr(self.akash_client, "_certificate_store"):
+                                            self.akash_client._certificate_store = {}
+
+                                        self.akash_client._certificate_store[wallet.address] = {
+                                            "certificate_pem": cert_pem,
+                                            "private_key_pem": key_pem,
+                                            "cert_path": cert_path,
+                                            "key_path": key_path
+                                        }
+
+                                        logger.info(f"Using validated certificate (serial: {local_serial})")
+                                        return True, cert_pem, key_pem
+
+                                    except Exception as e:
+                                        logger.error(f"Private key validation failed: {e}")
+                                        os.remove(cert_path)
+                                        os.remove(key_path)
+                                        break
+
+                        if not found_on_chain:
+                            logger.warning(f"Local certificate (serial: {local_serial}) not found on blockchain")
+                            os.remove(cert_path)
+                            os.remove(key_path)
+
+                except Exception as e:
+                    logger.warning(f"Failed to validate local certificate: {e}")
+                    try:
+                        os.remove(cert_path)
+                        os.remove(key_path)
+                    except:
+                        pass
 
             logger.info("Creating new certificate for mTLS")
             cert_result = self.create_certificate_for_mtls(wallet)

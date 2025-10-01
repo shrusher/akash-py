@@ -1836,6 +1836,315 @@ deployment:
         assert version_hex == expected_version_hex
         assert version_base64 == expected_version_base64
 
+    def test_manifest_version_multi_service_sdl(self):
+        """Test manifest version calculation for multi-service SDL with separate placements."""
+        import hashlib
+        import json
+        import base64
+        from akash.modules.manifest.utils import ManifestUtils
+
+        multi_service_sdl = '''version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+    env:
+      - BACKEND_URL=http://api:3000
+  api:
+    image: node:alpine
+    expose:
+      - port: 3000
+        as: 3000
+        to:
+          - service: web
+    env:
+      - NODE_ENV=production
+      - API_VERSION=v1
+    command:
+      - "sh"
+      - "-c"
+      - 'echo "const http = require(\\"http\\"); const server = http.createServer((req, res) => { res.writeHead(200); res.end(\\"API Service v1 - OK\\"); }); server.listen(3000);" > server.js && node server.js'
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+    api:
+      resources:
+        cpu:
+          units: 0.25
+        memory:
+          size: 256Mi
+        storage:
+          size: 512Mi
+  placement:
+    web-placement:
+      attributes:
+        host: akash
+      pricing:
+        web:
+          denom: uakt
+          amount: 1000
+    api-placement:
+      attributes:
+        host: akash
+      pricing:
+        api:
+          denom: uakt
+          amount: 1000
+deployment:
+  web:
+    web-placement:
+      profile: web
+      count: 1
+  api:
+    api-placement:
+      profile: api
+      count: 1
+'''
+
+        expected_version_base64 = "quf9XTmXpmjHy/zrZOT5R5LKJVNLyJkmnmNyoaDsWrE="
+
+        manifest_utils = ManifestUtils()
+        parse_result = manifest_utils.parse_sdl(multi_service_sdl)
+        assert parse_result.get('status') == 'success'
+
+        manifest_data = parse_result.get('manifest_data', [])
+        legacy_manifest = manifest_utils._create_legacy_manifest(manifest_data)
+
+        print("\n=== MANIFEST STRUCTURE ===")
+        print(json.dumps(legacy_manifest, indent=2))
+        print("\n=== MANIFEST JSON (for version) ===")
+
+        manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+        manifest_json = manifest_utils._escape_html(manifest_json)
+
+        print(manifest_json)
+        print("\n=== VERSION CALCULATION ===")
+
+        version_bytes = hashlib.sha256(manifest_json.encode()).digest()
+        version_base64 = base64.b64encode(version_bytes).decode('utf-8')
+        version_hex = hashlib.sha256(manifest_json.encode()).hexdigest()
+
+        print(f"Calculated base64: {version_base64}")
+        print(f"Expected base64:   {expected_version_base64}")
+        print(f"Calculated hex:    {version_hex}")
+        print(f"Match: {version_base64 == expected_version_base64}")
+
+        assert version_base64 == expected_version_base64, f"Version mismatch: got {version_base64}, expected {expected_version_base64}"
+
+    def test_manifest_version_three_service_sdl(self):
+        """Test manifest version calculation for 3-service SDL with command/args separation."""
+        import hashlib
+        import json
+        import base64
+        from akash.modules.manifest.utils import ManifestUtils
+
+        three_service_sdl = '''version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+    env:
+      - BACKEND_URL=http://api:3000
+  api:
+    image: node:alpine
+    expose:
+      - port: 3000
+        as: 3000
+        to:
+          - service: web
+    env:
+      - NODE_ENV=production
+      - API_VERSION=v1
+    command:
+      - "sh"
+      - "-c"
+    args:
+      - 'echo "const http = require(\\"http\\"); const server = http.createServer((req, res) => { res.writeHead(200); res.end(\\"API Service v1 - OK\\"); }); server.listen(3000);" > server.js && node server.js'
+  cache:
+    image: redis:alpine
+    expose:
+      - port: 6379
+        as: 6379
+        to:
+          - service: api
+    command:
+      - "redis-server"
+      - "--maxmemory"
+      - "64mb"
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+    api:
+      resources:
+        cpu:
+          units: 0.25
+        memory:
+          size: 256Mi
+        storage:
+          size: 512Mi
+    cache:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    web-placement:
+      attributes:
+        host: akash
+      pricing:
+        web:
+          denom: uakt
+          amount: 10000
+    api-placement:
+      attributes:
+        host: akash
+      pricing:
+        api:
+          denom: uakt
+          amount: 10000
+    cache-placement:
+      attributes:
+        host: akash
+      pricing:
+        cache:
+          denom: uakt
+          amount: 10000
+deployment:
+  web:
+    web-placement:
+      profile: web
+      count: 1
+  api:
+    api-placement:
+      profile: api
+      count: 1
+  cache:
+    cache-placement:
+      profile: cache
+      count: 1
+'''
+
+        expected_version_hex = "717e89d13b1e3215ed48dac3ff63f1d7c62dd32eae2bb1d62babf6726e99ae8c"
+        expected_version_base64 = "cX6J0TseMhXtSNrD/2Px18Yt0y6uK7HWK6v2cm6Zrow="
+
+        manifest_utils = ManifestUtils()
+        parse_result = manifest_utils.parse_sdl(three_service_sdl)
+        assert parse_result.get('status') == 'success'
+
+        manifest_data = parse_result.get('manifest_data', [])
+        legacy_manifest = manifest_utils._create_legacy_manifest(manifest_data)
+        manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+        manifest_json = manifest_utils._escape_html(manifest_json)
+
+        version_bytes = hashlib.sha256(manifest_json.encode()).digest()
+        version_base64 = base64.b64encode(version_bytes).decode('utf-8')
+        version_hex = hashlib.sha256(manifest_json.encode()).hexdigest()
+
+        assert version_hex == expected_version_hex
+        assert version_base64 == expected_version_base64
+
+    def test_manifest_version_persistent_sdl(self):
+        """Test manifest version calculation for SDL with persistence."""
+        import hashlib
+        import json
+        import base64
+        from akash.modules.manifest.utils import ManifestUtils
+
+        persistent_sdl = '''version: "2.0"
+services:
+  storage-test:
+    image: ubuntu:latest
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+    env:
+      - TEST_ENV=persistent-storage
+    command:
+      - "bash"
+      - "-c"
+    args:
+      - 'apt-get update && apt-get install -y nginx && echo "Persistent Storage Test" > /data/test.txt && nginx -g "daemon off;"'
+    params:
+      storage:
+        data:
+          mount: /data
+          readOnly: false
+profiles:
+  compute:
+    storage-test:
+      resources:
+        cpu:
+          units: 0.5
+        memory:
+          size: 512Mi
+        storage:
+          - size: 512Mi
+          - name: data
+            size: 1Gi
+            attributes:
+              persistent: true
+              class: beta3
+  placement:
+    global:
+      attributes:
+        host: akash
+      pricing:
+        storage-test:
+          denom: uakt
+          amount: 10000
+deployment:
+  storage-test:
+    global:
+      profile: storage-test
+      count: 1
+'''
+
+        expected_version_hex = "2d6e7b1b6c72da0c45600edd97270de90fb882739684418d8e21b119a70cf7c6"
+        expected_version_base64 = "LW57G2xy2gxFYA7dlycN6Q+4gnOWhEGNjiGxGacM98Y="
+
+        manifest_utils = ManifestUtils()
+        parse_result = manifest_utils.parse_sdl(persistent_sdl)
+        assert parse_result.get('status') == 'success'
+
+        manifest_data = parse_result.get('manifest_data', [])
+        legacy_manifest = manifest_utils._create_legacy_manifest(manifest_data)
+        manifest_json = json.dumps(legacy_manifest, sort_keys=True, separators=(',', ':'))
+        manifest_json = manifest_utils._escape_html(manifest_json)
+
+        version_bytes = hashlib.sha256(manifest_json.encode()).digest()
+        version_base64 = base64.b64encode(version_bytes).decode('utf-8')
+        version_hex = hashlib.sha256(manifest_json.encode()).hexdigest()
+
+        assert version_hex == expected_version_hex
+        assert version_base64 == expected_version_base64
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
