@@ -1,10 +1,43 @@
 import base64
 import logging
 from typing import Dict, List, Any
+from decimal import Decimal
 
 from akash.proto.cosmos.distribution.v1beta1 import query_pb2 as distribution_query_pb2
 
 logger = logging.getLogger(__name__)
+
+
+def amount_to_base_unit(int_str: str) -> str:
+    """
+    Convert chain amount to base unit by dividing by 10^18.
+
+    Args:
+        int_str: Integer string from chain
+
+    Returns:
+        str: Integer string in base units (e.g., uakt)
+    """
+    if not int_str:
+        return "0"
+    decimal_val = Decimal(int_str) / Decimal(10**18)
+    return str(int(decimal_val))
+
+
+def rate_to_decimal(int_str: str) -> str:
+    """
+    Convert chain rate/percentage to decimal by dividing by 10^18.
+
+    Args:
+        int_str: Integer string from chain
+
+    Returns:
+        str: Decimal string (e.g., "0.2" for 20%)
+    """
+    if not int_str:
+        return "0"
+    decimal_val = Decimal(int_str) / Decimal(10**18)
+    return str(decimal_val)
 
 
 class DistributionQuery:
@@ -55,7 +88,7 @@ class DistributionQuery:
                 response = distribution_query_pb2.QueryDelegationRewardsResponse()
                 response.ParseFromString(data)
                 return [
-                    {"denom": reward.denom, "amount": reward.amount}
+                    {"denom": reward.denom, "amount": amount_to_base_unit(reward.amount)}
                     for reward in response.rewards
                 ]
             else:
@@ -66,7 +99,7 @@ class DistributionQuery:
                     validator_rewards = {
                         "validator_address": delegation_reward.validator_address,
                         "rewards": [
-                            {"denom": reward.denom, "amount": reward.amount}
+                            {"denom": reward.denom, "amount": amount_to_base_unit(reward.amount)}
                             for reward in delegation_reward.reward
                         ],
                     }
@@ -113,7 +146,7 @@ class DistributionQuery:
 
             return {
                 "commission": [
-                    {"denom": commission.denom, "amount": commission.amount}
+                    {"denom": commission.denom, "amount": amount_to_base_unit(commission.amount)}
                     for commission in response.commission.commission
                 ]
             }
@@ -160,7 +193,7 @@ class DistributionQuery:
 
             return {
                 "rewards": [
-                    {"denom": reward.denom, "amount": reward.amount}
+                    {"denom": reward.denom, "amount": amount_to_base_unit(reward.amount)}
                     for reward in response.rewards.rewards
                 ]
             }
@@ -200,9 +233,9 @@ class DistributionQuery:
             response.ParseFromString(data)
 
             return {
-                "community_tax": response.params.community_tax,
-                "base_proposer_reward": response.params.base_proposer_reward,
-                "bonus_proposer_reward": response.params.bonus_proposer_reward,
+                "community_tax": rate_to_decimal(response.params.community_tax),
+                "base_proposer_reward": rate_to_decimal(response.params.base_proposer_reward),
+                "bonus_proposer_reward": rate_to_decimal(response.params.bonus_proposer_reward),
                 "withdraw_addr_enabled": response.params.withdraw_addr_enabled,
             }
 
@@ -240,7 +273,7 @@ class DistributionQuery:
 
             return {
                 "pool": [
-                    {"denom": coin.denom, "amount": coin.amount}
+                    {"denom": coin.denom, "amount": amount_to_base_unit(coin.amount)}
                     for coin in response.pool
                 ]
             }
@@ -288,7 +321,7 @@ class DistributionQuery:
             return [
                 {
                     "validator_period": str(slash.validator_period),
-                    "fraction": slash.fraction,
+                    "fraction": rate_to_decimal(slash.fraction),
                 }
                 for slash in response.slashes
             ]
