@@ -1,8 +1,21 @@
 import base64
 import logging
 from typing import Dict, List, Any, Optional
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
+
+
+def rate_to_decimal(value) -> str:
+    if isinstance(value, bytes):
+        int_str = value.decode('utf-8')
+    else:
+        int_str = str(value)
+
+    if not int_str:
+        return "0"
+    decimal_val = Decimal(int_str) / Decimal(10**18)
+    return str(decimal_val)
 
 
 class GovernanceQuery:
@@ -353,7 +366,7 @@ class GovernanceQuery:
                         "option": vote.option,
                         "options": (
                             [
-                                {"option": opt.option, "weight": opt.weight}
+                                {"option": opt.option, "weight": rate_to_decimal(opt.weight)}
                                 for opt in vote.options
                             ]
                             if vote.options
@@ -422,7 +435,7 @@ class GovernanceQuery:
                     "option": vote.option,
                     "options": (
                         [
-                            {"option": opt.option, "weight": opt.weight}
+                            {"option": opt.option, "weight": rate_to_decimal(opt.weight)}
                             for opt in vote.options
                         ]
                         if vote.options
@@ -626,9 +639,9 @@ class GovernanceQuery:
 
                 elif param_type == "tallying" and params_response.tally_params:
                     tally_params = params_response.tally_params
-                    all_params["quorum"] = tally_params.quorum
-                    all_params["threshold"] = tally_params.threshold
-                    all_params["veto_threshold"] = tally_params.veto_threshold
+                    all_params["quorum"] = rate_to_decimal(tally_params.quorum)
+                    all_params["threshold"] = rate_to_decimal(tally_params.threshold)
+                    all_params["veto_threshold"] = rate_to_decimal(tally_params.veto_threshold)
 
             return all_params
 
