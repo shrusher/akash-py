@@ -196,7 +196,7 @@ if all_providers:
     print(f"Provider: {provider_detail['host_uri']}")
 
 print(f"Total: {len(all_providers)}, GPU: {len(gpu_providers)}")
-print(f"High Performance: {len(high_perf_providers)}, US West: {len(us_providers)}")
+print(f"High performance: {len(high_perf_providers)}, US West: {len(us_providers)}")
 ```
 
 ### Market operations
@@ -262,12 +262,12 @@ balance = wallet.get_balance()
 The client provides access to all Akash modules:
 
 - **audit**: Provider audit operations
-- **auth**: Authentication operations
-- **authz**: Authorization operations
+- **auth**: Auth operations
+- **authz**: Authz operations
 - **bank**: Token transfers and balance queries
 - **cert**: Certificate management
 - **deployment**: Deployment lifecycle management
-- **discovery**: Service discovery operations
+- **discovery**: Discovery operations
 - **distribution**: Staking rewards distribution
 - **escrow**: Escrow account management
 - **evidence**: Evidence of misbehavior submission
@@ -275,12 +275,12 @@ The client provides access to all Akash modules:
 - **governance**: Governance proposals and voting
 - **ibc**: Inter-blockchain communication
 - **inflation**: Inflation parameter queries
-- **inventory**: Hardware inventory management
+- **inventory**: Inventory management
 - **manifest**: Deployment manifest operations
 - **market**: Bidding and lease operations
 - **provider**: Provider discovery and filtering
 - **slashing**: Validator slashing operations
-- **staking**: Validator staking operations
+- **staking**: Staking operations
 
 ## Network endpoints
 
@@ -298,4 +298,4 @@ The client provides access to all Akash modules:
 
 - [This SDK documentation](https://akash-py.cosmosrescue.com/)
 - [Akash documentation](https://docs.akash.network/)
-- [SDL specification](https://docs.akash.network/sdl)
+- [SDL specification](https://akash.network/docs/getting-started/stack-definition-language)
