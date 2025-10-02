@@ -1,10 +1,30 @@
 import base64
 import logging
 from typing import Dict, Optional, Any
+from decimal import Decimal
 
 from akash.proto.cosmos.mint.v1beta1 import query_pb2 as mint_query_pb2
 
 logger = logging.getLogger(__name__)
+
+
+def amount_to_base_unit(int_str: str) -> str:
+    if not int_str:
+        return "0"
+    decimal_val = Decimal(int_str) / Decimal(10**18)
+    return str(int(decimal_val))
+
+
+def rate_to_decimal(value) -> str:
+    if isinstance(value, bytes):
+        int_str = value.decode('utf-8')
+    else:
+        int_str = str(value)
+
+    if not int_str:
+        return "0"
+    decimal_val = Decimal(int_str) / Decimal(10**18)
+    return str(decimal_val)
 
 
 class InflationQuery:
@@ -46,10 +66,10 @@ class InflationQuery:
                         params = query_response.params
                         return {
                             "mint_denom": params.mint_denom,
-                            "inflation_rate_change": params.inflation_rate_change,
-                            "inflation_max": params.inflation_max,
-                            "inflation_min": params.inflation_min,
-                            "goal_bonded": params.goal_bonded,
+                            "inflation_rate_change": rate_to_decimal(params.inflation_rate_change),
+                            "inflation_max": rate_to_decimal(params.inflation_max),
+                            "inflation_min": rate_to_decimal(params.inflation_min),
+                            "goal_bonded": rate_to_decimal(params.goal_bonded),
                             "blocks_per_year": str(params.blocks_per_year),
                         }
                 else:
@@ -92,7 +112,7 @@ class InflationQuery:
                     query_response.ParseFromString(response_data)
 
                     if query_response.inflation:
-                        return query_response.inflation.decode("utf-8")
+                        return rate_to_decimal(query_response.inflation)
                 else:
                     logger.error(f"Inflation query failed with code {code}")
 
@@ -138,7 +158,7 @@ class InflationQuery:
                     query_response.ParseFromString(response_data)
 
                     if query_response.annual_provisions:
-                        return query_response.annual_provisions.decode("utf-8")
+                        return amount_to_base_unit(query_response.annual_provisions.decode("utf-8"))
                 else:
                     logger.error(f"Annual provisions query failed with code {code}")
 
