@@ -342,8 +342,7 @@ class TestProviderClientFunctionality:
         utils_methods = [
             'get_provider_attributes',
             'query_providers_by_attributes',
-            'validate_provider_config',
-            'get_provider_info_basic'
+            'validate_provider_config'
         ]
 
         for method in utils_methods:
@@ -379,13 +378,8 @@ class TestProviderClientFunctionality:
         """Test provider status checking."""
         self.mock_client.rpc_query.return_value = {'response': {'code': 0, 'value': None}}
 
-        from unittest.mock import patch
-        with patch.object(self.client, 'get_provider') as mock_get_provider:
-            mock_get_provider.return_value = None
-
-            result = self.client.get_provider_info_basic('akash1test')
-
-            assert result == {"status": "not_found", "available": False}
+        result = self.client.get_provider('akash1test')
+        assert result == {}
 
 
 class TestProviderTransactionFunctionality:
@@ -491,7 +485,7 @@ class TestProviderErrorScenarios:
             mock_get_provider.side_effect = Exception("Network error")
 
             with pytest.raises(Exception):
-                self.client.get_provider_info_basic('akash1test')
+                self.client.get_provider('akash1test')
 
     def test_provider_attribute_query_error_handling(self):
         """Test provider attribute query error handling."""
@@ -517,13 +511,13 @@ class TestProviderStatusFunctionality:
         self.mock_client = Mock()
         self.client = ProviderClient(self.mock_client)
 
-    def test_get_provider_status_method_exists(self):
-        """Test that get_provider_info_basic method exists."""
-        assert hasattr(self.client, 'get_provider_info_basic')
-        assert callable(getattr(self.client, 'get_provider_info_basic'))
+    def test_get_provider_method_exists(self):
+        """Test that get_provider method exists."""
+        assert hasattr(self.client, 'get_provider')
+        assert callable(getattr(self.client, 'get_provider'))
 
-    def test_get_provider_status_success(self):
-        """Test successful provider status query from blockchain."""
+    def test_get_provider_success(self):
+        """Test successful provider query from blockchain."""
         mock_provider = {
             'owner': 'akash1test',
             'host_uri': 'https://provider.akash.com',
@@ -535,32 +529,30 @@ class TestProviderStatusFunctionality:
         with patch.object(self.client, 'get_provider') as mock_get_provider:
             mock_get_provider.return_value = mock_provider
 
-            result = self.client.get_provider_info_basic('akash1test')
+            result = self.client.get_provider('akash1test')
 
-            assert result['status'] == 'active'
-            assert result['available'] is True
+            assert result['owner'] == 'akash1test'
             assert result['host_uri'] == 'https://provider.akash.com'
             assert result['attributes'] == [{'key': 'region', 'value': 'us-west'}]
 
-    def test_get_provider_status_not_found(self):
-        """Test provider status when provider not found."""
+    def test_get_provider_not_found(self):
+        """Test provider query when provider not found."""
         from unittest.mock import patch
         with patch.object(self.client, 'get_provider') as mock_get_provider:
-            mock_get_provider.return_value = None
+            mock_get_provider.return_value = {}
 
-            result = self.client.get_provider_info_basic('akash1test')
+            result = self.client.get_provider('akash1test')
 
-            assert result['status'] == 'not_found'
-            assert result['available'] is False
+            assert result == {}
 
-    def test_get_provider_status_error_handling(self):
-        """Test error handling in provider status query."""
+    def test_get_provider_error_handling(self):
+        """Test error handling in provider query."""
         from unittest.mock import patch
         with patch.object(self.client, 'get_provider') as mock_get_provider:
             mock_get_provider.side_effect = Exception("RPC connection failed")
 
             with pytest.raises(Exception) as exc_info:
-                self.client.get_provider_info_basic('akash1test')
+                self.client.get_provider('akash1test')
 
             assert "RPC connection failed" in str(exc_info.value)
 

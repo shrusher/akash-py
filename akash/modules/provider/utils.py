@@ -121,42 +121,6 @@ class ProviderUtils:
                 "warnings": [],
             }
 
-    def get_provider_info_basic(self, owner_address: str) -> Dict[str, Any]:
-        """
-        Get basic provider information from blockchain.
-
-        Args:
-            owner_address: Provider owner address
-
-        Returns:
-            Basic provider status information
-        """
-        try:
-            logger.info(f"Querying provider status: {owner_address}")
-
-            provider = self.get_provider(owner_address)
-            if not provider:
-                return {"status": "not_found", "available": False}
-
-            host_uri = provider.get("host_uri", "")
-            if host_uri:
-                return {
-                    "status": "active",
-                    "available": True,
-                    "host_uri": host_uri,
-                    "attributes": provider.get("attributes", []),
-                }
-            else:
-                return {
-                    "status": "inactive",
-                    "available": False,
-                    "attributes": provider.get("attributes", []),
-                }
-
-        except Exception as e:
-            logger.error(f"Failed to get provider status: {e}")
-            raise
-
     def validate_provider_endpoint(self, provider_address: str) -> bool:
         """
         Validate provider endpoint connectivity and DNS resolution.

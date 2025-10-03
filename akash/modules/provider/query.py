@@ -1,5 +1,6 @@
 import base64
 import logging
+import requests
 from typing import Dict, List, Any, Optional
 
 from akash.proto.akash.provider.v1beta3 import query_pb2 as provider_query_pb2
@@ -158,6 +159,29 @@ class ProviderQuery(MarketQuery):
             logger.error(f"Failed to get provider {owner_address}: {e}")
             raise
 
+    def _get_all_providers(self) -> List[Dict[str, Any]]:
+        """
+        Internal method to fetch all providers across all pages.
+
+        Returns:
+            List of all provider information dictionaries
+        """
+        all_providers = []
+        offset = 0
+        limit = 100
+
+        while True:
+            providers = self.get_providers(limit=limit, offset=offset)
+            if not providers:
+                break
+            all_providers.extend(providers)
+            if len(providers) < limit:
+                break
+            offset += limit
+
+        return all_providers
+
+
     def get_provider_leases(self, owner_address: str) -> List[Dict[str, Any]]:
         """
         Get active leases for a provider.
@@ -194,12 +218,33 @@ class ProviderQuery(MarketQuery):
             logger.error(f"Failed to get provider leases: {e}")
             raise
 
+    def get_provider_version(self, owner_address: str, timeout: int = 5000) -> Optional[Dict[str, str]]:
+        """
+        Get provider version information via REST API.
+
+        Args:
+            owner_address: Provider owner address
+            timeout: Timeout in milliseconds (default: 5000)
+
+        Returns:
+            Dict with version information:
+            - version: Provider version string
+            - cosmos_sdk_version: Cosmos SDK version string
+            Returns None if the query fails.
+        """
+        try:
+            logger.info(f"Querying provider version: {owner_address}")
+            return self.akash_client.grpc_client._get_provider_version(owner_address, timeout)
+        except Exception as e:
+            logger.warning(f"Failed to get provider version for {owner_address}: {e}")
+            return None
+
     def get_provider_status(self, owner_address: str) -> Dict[str, Any]:
         """
-        Get provider status information via off-chain gRPC query.
+        Get provider status information via off-chain gRPC query with REST fallback.
 
-        This method queries the provider's gRPC endpoint directly to get real-time status
-        information including inventory, lease counts, and cluster status.
+        This method first attempts to query the provider's gRPC endpoint directly for real-time
+        status information. If gRPC fails, it automatically falls back to REST API.
 
         Args:
             owner_address: Provider owner address
@@ -217,7 +262,7 @@ class ProviderQuery(MarketQuery):
             - active_leases: Number of active leases
 
         Raises:
-            Exception: If the query fails or provider endpoint cannot be reached
+            Exception: If both gRPC and REST queries fail or provider endpoint cannot be reached
         """
         try:
             logger.info(f"Querying off-chain provider status: {owner_address}")
@@ -228,18 +273,43 @@ class ProviderQuery(MarketQuery):
 
             if result.get("status") == "success":
                 logger.info(
-                    f"Successfully retrieved off-chain status for provider {owner_address}"
+                    f"Successfully retrieved off-chain status for provider {owner_address} via gRPC"
                 )
                 return result.get("response", {})
             else:
-                error_msg = f"Failed to get off-chain provider status for {owner_address}: {result.get('error', 'Unknown error')}"
+                logger.warning(
+                    f"gRPC failed for {owner_address}: {result.get('error', 'Unknown error')}, trying REST fallback..."
+                )
+
+        except Exception as grpc_error:
+            logger.warning(
+                f"gRPC failed for {owner_address}: {grpc_error}, trying REST fallback..."
+            )
+
+        try:
+            provider = self.get_provider(owner_address)
+            if not provider or not provider.get('host_uri'):
+                error_msg = f"Provider {owner_address} has no host_uri for REST fallback"
                 logger.error(error_msg)
                 raise Exception(error_msg)
 
-        except Exception as e:
-            error_msg = (
-                f"Failed to get off-chain provider status for {owner_address}: {e}"
-            )
+            host_uri = provider.get('host_uri')
+            logger.info(f"Attempting REST fallback to {host_uri}/status")
+
+            response = requests.get(f"{host_uri}/status", timeout=10, verify=False)
+
+            if response.status_code == 200:
+                logger.info(
+                    f"Successfully retrieved off-chain status for provider {owner_address} via REST"
+                )
+                return response.json()
+            else:
+                error_msg = f"REST status failed with HTTP {response.status_code}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
+
+        except Exception as rest_error:
+            error_msg = f"Both gRPC and REST failed for {owner_address}: {rest_error}"
             logger.error(error_msg)
             raise Exception(error_msg)
 
@@ -259,7 +329,7 @@ class ProviderQuery(MarketQuery):
         try:
             logger.info(f"Getting providers in region: {region}")
 
-            providers = self.get_providers()
+            providers = self._get_all_providers()
             region_providers = []
 
             for provider in providers:
@@ -305,7 +375,7 @@ class ProviderQuery(MarketQuery):
         try:
             logger.info(f"Getting providers with capabilities: {capabilities}")
 
-            providers = self.get_providers()
+            providers = self._get_all_providers()
             capable_providers = []
 
             for provider in providers:
@@ -370,7 +440,7 @@ class ProviderQuery(MarketQuery):
                 f"Getting providers with price <= {max_price_per_hour} {currency}/hour"
             )
 
-            providers = self.get_providers()
+            providers = self._get_all_providers()
             affordable_providers = []
 
             for provider in providers:

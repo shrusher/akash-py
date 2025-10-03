@@ -395,7 +395,7 @@ class ProviderGRPCClient:
             }
 
         if check_version:
-            version_info = self.get_provider_version(
+            version_info = self._get_provider_version(
                 provider_address, timeout=(timeout or 5) * 1000
             )
 
@@ -616,21 +616,24 @@ class ProviderGRPCClient:
             "attempts": actual_retries + 1,
         }
 
-    def get_provider_version(
+    def _get_provider_version(
         self, provider_address: str, timeout: int = 5000
     ) -> Optional[Dict[str, str]]:
         """
-        Get provider version information from REST endpoint.
+        Internal method to get provider version information from REST endpoint.
 
         Args:
             provider_address: Provider's address on blockchain
             timeout: Timeout in milliseconds
 
         Returns:
-            Dict with akash version and cosmos SDK version, or None if failed
+            Dict with provider version and cosmos SDK version, or None if failed
         """
         try:
             host_uri = self.akash_client.get_provider_endpoint(provider_address)
+
+            if not host_uri.startswith(('http://', 'https://')):
+                host_uri = f"https://{host_uri}"
 
             response = requests.get(
                 f"{host_uri}/version",
@@ -647,7 +650,7 @@ class ProviderGRPCClient:
                 )
 
                 return {
-                    "akash_version": akash_data.get("version"),
+                    "version": akash_data.get("version"),
                     "cosmos_sdk_version": cosmos_sdk_ver,
                 }
 
@@ -671,6 +674,9 @@ class ProviderGRPCClient:
         """
         try:
             host_uri = self.akash_client.get_provider_endpoint(provider_address)
+
+            if not host_uri.startswith(('http://', 'https://')):
+                host_uri = f"https://{host_uri}"
 
             response = requests.get(
                 f"{host_uri}/status",
