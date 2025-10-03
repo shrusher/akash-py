@@ -1,10 +1,31 @@
 import base64
 import logging
+from decimal import Decimal
 from typing import Dict, List, Optional, Any
 
 from akash.proto.cosmos.staking.v1beta1 import query_pb2 as staking_query_pb2
 
 logger = logging.getLogger(__name__)
+
+
+def rate_to_decimal(value) -> str:
+    """
+    Convert rate/shares from chain format (integer scaled by 10^18) to decimal string.
+
+    Args:
+        value: Rate or shares value (string, bytes, or numeric)
+
+    Returns:
+        Decimal string representation
+    """
+    if isinstance(value, bytes):
+        int_str = value.decode('utf-8')
+    else:
+        int_str = str(value)
+    if not int_str:
+        return "0"
+    decimal_val = Decimal(int_str) / Decimal(10**18)
+    return str(decimal_val)
 
 
 class StakingQuery:
@@ -138,14 +159,20 @@ class StakingQuery:
                         "jailed": validator.jailed,
                         "status": validator.status,
                         "tokens": validator.tokens,
-                        "delegator_shares": validator.delegator_shares,
+                        "delegator_shares": rate_to_decimal(validator.delegator_shares),
                         "description": {
                             "moniker": validator.description.moniker,
                             "identity": validator.description.identity,
                             "website": validator.description.website,
                             "details": validator.description.details,
                         },
-                        "commission_rate": validator.commission.commission_rates.rate,
+                        "commission": {
+                            "commission_rates": {
+                                "rate": rate_to_decimal(validator.commission.commission_rates.rate),
+                                "max_rate": rate_to_decimal(validator.commission.commission_rates.max_rate),
+                                "max_change_rate": rate_to_decimal(validator.commission.commission_rates.max_change_rate),
+                            },
+                        },
                         "min_self_delegation": validator.min_self_delegation,
                     }
                 )
@@ -252,7 +279,7 @@ class StakingQuery:
                         "delegation": {
                             "delegator_address": delegation_response.delegation.delegator_address,
                             "validator_address": delegation_response.delegation.validator_address,
-                            "shares": delegation_response.delegation.shares,
+                            "shares": rate_to_decimal(delegation_response.delegation.shares),
                         },
                         "balance": {
                             "denom": delegation_response.balance.denom,
@@ -305,7 +332,7 @@ class StakingQuery:
                             "delegation": {
                                 "delegator_address": delegation.delegation.delegator_address,
                                 "validator_address": delegation.delegation.validator_address,
-                                "shares": delegation.delegation.shares,
+                                "shares": rate_to_decimal(delegation.delegation.shares),
                             },
                             "balance": {
                                 "denom": delegation.balance.denom,
@@ -356,13 +383,18 @@ class StakingQuery:
             params_response = staking_query_pb2.QueryParamsResponse()
             params_response.ParseFromString(response_data)
 
-            return {
+            result = {
                 "unbonding_time": str(params_response.params.unbonding_time),
                 "max_validators": params_response.params.max_validators,
                 "max_entries": params_response.params.max_entries,
                 "historical_entries": params_response.params.historical_entries,
                 "bond_denom": params_response.params.bond_denom,
             }
+
+            if hasattr(params_response.params, "min_commission_rate"):
+                result["min_commission_rate"] = rate_to_decimal(params_response.params.min_commission_rate)
+
+            return result
 
         except Exception as e:
             logger.error(f"Failed to get staking params: {e}")
@@ -522,7 +554,7 @@ class StakingQuery:
                                         else ""
                                     ),
                                     "initial_balance": entry.redelegation_entry.initial_balance,
-                                    "shares_dst": entry.redelegation_entry.shares_dst,
+                                    "shares_dst": rate_to_decimal(entry.redelegation_entry.shares_dst),
                                     "balance": entry.balance,
                                 }
                             )
@@ -574,7 +606,7 @@ class StakingQuery:
                                 "delegation": {
                                     "delegator_address": delegation_response.delegation.delegator_address,
                                     "validator_address": delegation_response.delegation.validator_address,
-                                    "shares": delegation_response.delegation.shares,
+                                    "shares": rate_to_decimal(delegation_response.delegation.shares),
                                 },
                                 "balance": {
                                     "denom": delegation_response.balance.denom,
@@ -647,7 +679,7 @@ class StakingQuery:
                                         else ""
                                     ),
                                     "initial_balance": entry.redelegation_entry.initial_balance,
-                                    "shares_dst": entry.redelegation_entry.shares_dst,
+                                    "shares_dst": rate_to_decimal(entry.redelegation_entry.shares_dst),
                                     "balance": entry.balance,
                                 }
                             )
