@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from ..auth.utils import validate_address
 
@@ -61,7 +61,7 @@ class DiscoveryUtils:
             return {"status": "failed", "error": str(e), "provider": provider_uri}
 
     def get_providers_status(
-            self, provider_uris: list[str], use_https: bool = True
+            self, provider_uris: List[str], use_https: bool = True
     ) -> Dict[str, Any]:
         """
         Get status information for multiple providers.

@@ -142,8 +142,12 @@ class TestRunner:
                 'converters': module_config['converters']
             }
 
-    def run_all_tests(self, modules_to_run: List[str] = None) -> None:
-        """Run all validation tests."""
+    def run_all_tests(self, modules_to_run: List[str] = None) -> bool:
+        """Run all validation tests.
+
+        Returns:
+            bool: True if all tests passed, False otherwise
+        """
         self.start_time = time.time()
 
         # Determine which modules to run
@@ -152,7 +156,7 @@ class TestRunner:
             if not modules:
                 print(f"❌ No valid modules found: {modules_to_run}")
                 print(f"Available modules: {', '.join(TEST_MODULES.keys())}")
-                return
+                return False
         else:
             modules = TEST_MODULES
 
@@ -176,6 +180,13 @@ class TestRunner:
 
         # Display summary
         self.display_summary()
+
+        # Return overall success
+        total_modules = len(self.results)
+        successful_modules = sum(1 for r in self.results.values() if r['success'])
+        total_failed = sum(r['failed'] for r in self.results.values())
+
+        return successful_modules == total_modules and total_failed == 0
 
     def display_summary(self) -> None:
         """Display test summary."""
@@ -340,14 +351,17 @@ Available modules:
         if invalid_modules:
             print(f"❌ Invalid modules: {', '.join(invalid_modules)}")
             print(f"Available modules: {', '.join(TEST_MODULES.keys())}")
-            return
+            sys.exit(1)
 
         if 'all' in args.modules:
             modules_to_run = None  # Run all
         else:
             modules_to_run = args.modules
 
-    runner.run_all_tests(modules_to_run)
+    all_passed = runner.run_all_tests(modules_to_run)
+
+    # Exit with non-zero code if any tests failed
+    sys.exit(0 if all_passed else 1)
 
 
 if __name__ == '__main__':
