@@ -164,6 +164,7 @@ class StakingQuery:
                             "moniker": validator.description.moniker,
                             "identity": validator.description.identity,
                             "website": validator.description.website,
+                            "security_contact": validator.description.security_contact,
                             "details": validator.description.details,
                         },
                         "commission": {
