@@ -392,7 +392,12 @@ class StakingQuery:
             }
 
             if hasattr(params_response.params, "min_commission_rate"):
-                result["min_commission_rate"] = rate_to_decimal(params_response.params.min_commission_rate)
+                try:
+                    min_rate = params_response.params.min_commission_rate
+                    if min_rate:
+                        result["min_commission_rate"] = rate_to_decimal(min_rate)
+                except (ValueError, Exception):
+                    pass
 
             return result
 

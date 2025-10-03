@@ -443,12 +443,14 @@ class TestStakingQueryOperations:
             mock_validator.jailed = False
             mock_validator.status = 3  # Bonded
             mock_validator.tokens = "1000000"
-            mock_validator.delegator_shares = "1000000.000000000000000000"
+            mock_validator.delegator_shares = "1000000000000000000000000"
             mock_validator.description.moniker = "Test Validator"
             mock_validator.description.identity = ""
             mock_validator.description.website = ""
             mock_validator.description.details = ""
-            mock_validator.commission.commission_rates.rate = "0.100000000000000000"
+            mock_validator.commission.commission_rates.rate = "100000000000000000"
+            mock_validator.commission.commission_rates.max_rate = "200000000000000000"
+            mock_validator.commission.commission_rates.max_change_rate = "10000000000000000"
             mock_validator.min_self_delegation = "1"
 
             mock_instance.validators = [mock_validator]
@@ -502,12 +504,14 @@ class TestStakingQueryOperations:
             mock_validator.jailed = False
             mock_validator.status = 3  # BOND_STATUS_BONDED
             mock_validator.tokens = "1000000"
-            mock_validator.delegator_shares = "1000000.000000000000000000"
+            mock_validator.delegator_shares = "1000000000000000000000000"
             mock_validator.description.moniker = "Test Validator"
             mock_validator.description.identity = ""
             mock_validator.description.website = ""
             mock_validator.description.details = ""
-            mock_validator.commission.commission_rates.rate = "0.100000000000000000"
+            mock_validator.commission.commission_rates.rate = "100000000000000000"
+            mock_validator.commission.commission_rates.max_rate = "200000000000000000"
+            mock_validator.commission.commission_rates.max_change_rate = "10000000000000000"
             mock_validator.min_self_delegation = "1000000"
 
             mock_instance.validators = [mock_validator]
@@ -537,12 +541,14 @@ class TestStakingQueryOperations:
             mock_validator.jailed = False
             mock_validator.status = 1  # BOND_STATUS_UNBONDED
             mock_validator.tokens = "1000000"
-            mock_validator.delegator_shares = "1000000.000000000000000000"
+            mock_validator.delegator_shares = "1000000000000000000000000"
             mock_validator.description.moniker = "Test Validator"
             mock_validator.description.identity = ""
             mock_validator.description.website = ""
             mock_validator.description.details = ""
-            mock_validator.commission.commission_rates.rate = "0.100000000000000000"
+            mock_validator.commission.commission_rates.rate = "100000000000000000"
+            mock_validator.commission.commission_rates.max_rate = "200000000000000000"
+            mock_validator.commission.commission_rates.max_change_rate = "10000000000000000"
             mock_validator.min_self_delegation = "1000000"
 
             mock_instance.validators = [mock_validator]
@@ -596,7 +602,7 @@ class TestStakingQueryOperations:
             mock_delegation_response = Mock()
             mock_delegation_response.delegation.delegator_address = "akash1test"
             mock_delegation_response.delegation.validator_address = "akashvaloper1test"
-            mock_delegation_response.delegation.shares = "1000000.000000000000000000"
+            mock_delegation_response.delegation.shares = "1000000000000000000000000"
             mock_delegation_response.balance.denom = "uakt"
             mock_delegation_response.balance.amount = "1000000"
 
@@ -636,7 +642,7 @@ class TestStakingQueryOperations:
             mock_delegation_response = Mock()
             mock_delegation_response.delegation.delegator_address = "akash1test"
             mock_delegation_response.delegation.validator_address = "akashvaloper1test"
-            mock_delegation_response.delegation.shares = "1000000.000000000000000000"
+            mock_delegation_response.delegation.shares = "1000000000000000000000000"
             mock_delegation_response.balance.denom = "uakt"
             mock_delegation_response.balance.amount = "1000000"
 
@@ -678,6 +684,7 @@ class TestStakingQueryOperations:
             mock_instance.params.max_entries = 7
             mock_instance.params.historical_entries = 10000
             mock_instance.params.bond_denom = "uakt"
+            mock_instance.params.min_commission_rate = "50000000000000000"  # 0.05 or 5%
 
             mock_response_class.return_value = mock_instance
 
@@ -686,6 +693,7 @@ class TestStakingQueryOperations:
             assert result["unbonding_time"] == "1814400s"
             assert result["max_validators"] == 125
             assert result["bond_denom"] == "uakt"
+            assert result["min_commission_rate"] == "0.05"
 
     def test_get_pool_success(self):
         """Test successful staking pool query."""
