@@ -58,7 +58,7 @@ try:
     __version__ = version("akash")
 except Exception:
     # Fallback for development when package isn't installed
-    __version__ = "0.3.1-dev"
+    __version__ = "0.4.0-dev"
 
 from .client import AkashClient  # noqa: E402
 from .modules.audit import AuditClient  # noqa: E402
