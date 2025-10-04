@@ -1,6 +1,6 @@
 # Akash Python SDK
 
-Python SDK for interacting with the Akash Network blockchain and deploying workloads on the decentralized cloud
+Python SDK for interacting with the Akash blockchain and deploying workloads on the decentralized cloud
 marketplace.
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
@@ -81,13 +81,13 @@ import time
 wallet = AkashWallet.from_mnemonic("your mnemonic here")
 client = AkashClient("https://akash-rpc.polkachu.com:443")
 
-print("Step 1: Ensuring certificate for mTLS...")
+print("Step 1: Ensuring certificate")
 success, cert_pem, key_pem = client.cert.ensure_certificate(wallet)
 if not success:
     print("Certificate setup failed")
     exit()
 
-print("Step 2: Creating deployment from SDL...")
+print("Step 2: Creating deployment from SDL")
 sdl = '''
 version: "2.0"
 services:
@@ -144,7 +144,7 @@ if not bids:
     print("No bids received")
     exit()
 
-print("Step 4: Selecting best bid and creating lease...")
+print("Step 4: Selecting best bid and creating lease")
 provider_addresses = [b['bid_id']['provider'] for b in bids]
 valid_providers = client.provider.filter_valid_providers(provider_addresses)
 if not valid_providers:
@@ -161,7 +161,7 @@ if not lease['success']:
 
 print(f"Lease created with provider: {lease['provider_endpoint']}")
 
-print("Step 5: Submitting manifest...")
+print("Step 5: Submitting manifest")
 time.sleep(10)
 
 manifest_result = client.manifest.submit_manifest(
@@ -177,6 +177,48 @@ if manifest_result.get('status') == 'success':
     print("Your nginx application is now running")
 else:
     print(f"Manifest submission failed: {manifest_result.get('error')}")
+```
+
+### Query deployment manifest
+
+```python
+from akash import AkashClient, AkashWallet
+import time
+
+wallet = AkashWallet.from_mnemonic("your mnemonic here")
+client = AkashClient("https://akash-rpc.polkachu.com:443")
+
+success, cert_pem, key_pem = client.cert.ensure_certificate(wallet)
+
+lease_id = {
+    "dseq": "12345",
+    "gseq": 1,
+    "oseq": 1
+}
+
+time.sleep(10)
+
+result = client.manifest.get_deployment_manifest(
+    provider_endpoint="https://provider.example.com:8443",
+    lease_id=lease_id,
+    cert_pem=cert_pem,
+    key_pem=key_pem
+)
+
+if result["status"] == "success":
+    print(f"Provider version: {result['provider_version']}")
+
+    for group in result["manifest"]:
+        for service in group['services']:
+            print(f"Service: {service['name']}")
+            print(f"Image: {service['image']}")
+
+            resources = service['resources']
+            cpu = resources['cpu']['units']['val']
+            mem = int(resources['memory']['size']['val']) / (1024**2)
+            print(f"CPU: {cpu} millicores, Memory: {mem:.0f}Mi")
+else:
+    print(f"Query failed: {result['error']}")
 ```
 
 ### Provider discovery
@@ -254,7 +296,10 @@ wallet = AkashWallet.from_mnemonic("your mnemonic phrase")
 wallet = AkashWallet.from_private_key(private_key_bytes)
 
 signed_tx = wallet.sign_transaction(tx_data)
-balance = wallet.get_balance()
+
+client = AkashClient("https://akash-rpc.polkachu.com:443")
+balance = client.bank.get_balance(wallet.address)
+print(f"Balance: {balance} uakt")
 ```
 
 ### Sub-clients

@@ -31,8 +31,6 @@ class ManifestQuery:
                 - dseq (str): Deployment sequence
                 - gseq (int): Group sequence
                 - oseq (int): Order sequence
-                Note: owner and provider fields are not used in the path.
-                Owner is authenticated via mTLS certificate.
             cert_pem: Client certificate PEM
             key_pem: Client private key PEM
             timeout: Request timeout in seconds (default: 30)
