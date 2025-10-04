@@ -292,8 +292,7 @@ print(f"New wallet: {wallet.address}")
 print(f"Mnemonic: {wallet.mnemonic}")
 
 wallet = AkashWallet.from_mnemonic("your mnemonic phrase")
-
-wallet = AkashWallet.from_private_key(private_key_bytes)
+wallet = AkashWallet.from_private_key("your private key")
 
 signed_tx = wallet.sign_transaction(tx_data)
 

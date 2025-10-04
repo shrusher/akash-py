@@ -154,19 +154,42 @@ class AkashWallet:
         return cls(private_key, mnemonic)
 
     @classmethod
-    def from_private_key(cls, private_key_bytes: bytes) -> "AkashWallet":
+    def from_private_key(cls, private_key) -> "AkashWallet":
         """
-        Create wallet from raw private key bytes.
+        Create wallet from private key (bytes or hex string).
 
         Args:
-            private_key_bytes (bytes): 32-byte private key
+            private_key (bytes or str): 32-byte private key as bytes or 64-character hex string
 
         Returns:
             AkashWallet: Wallet instance
+
+        Example:
+            ```python
+            # From hex string (64 characters)
+            wallet = AkashWallet.from_private_key("a1b2c3d4e5f6...")
+            print(f"Address: {wallet.address}")
+
+            # From bytes
+            private_key_bytes = bytes.fromhex("a1b2c3d4e5f6...")
+            wallet = AkashWallet.from_private_key(private_key_bytes)
+            print(f"Address: {wallet.address}")
+            ```
         """
-        private_key = SigningKey.from_string(private_key_bytes, curve=SECP256k1)
+        if isinstance(private_key, str):
+            try:
+                private_key_bytes = bytes.fromhex(private_key)
+            except ValueError as e:
+                raise ValueError(f"Invalid hex private key: {e}")
+        else:
+            private_key_bytes = private_key
+
+        if len(private_key_bytes) != 32:
+            raise ValueError(f"Private key must be 32 bytes, got {len(private_key_bytes)}")
+
+        private_key_obj = SigningKey.from_string(private_key_bytes, curve=SECP256k1)
         logger.info("Created wallet from private key")
-        return cls(private_key)
+        return cls(private_key_obj)
 
     @property
     def address(self) -> str:
