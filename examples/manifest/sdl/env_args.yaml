@@ -1,0 +1,79 @@
+version: "2.0"
+services:
+  app:
+    image: ubuntu:latest
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+    env:
+      - APP_NAME=Akash Test Application
+      - APP_VERSION=1.0.0
+      - ENVIRONMENT=testnet
+      - DEBUG_MODE=true
+      - API_KEY=test_key_12345
+      - DATABASE_URL=postgres://user:pass@localhost:5432/db
+      - MAX_CONNECTIONS=100
+      - TIMEOUT_SECONDS=30
+      - FEATURE_FLAG_A=enabled
+      - FEATURE_FLAG_B=disabled
+    command:
+      - "bash"
+      - "-c"
+    args:
+      - |
+        apt-get update && apt-get install -y nginx curl
+
+        cat > /usr/share/nginx/html/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html>
+        <head><title>Environment Test</title></head>
+        <body>
+          <h1>Environment Variables Test</h1>
+          <ul>
+            <li>APP_NAME: $APP_NAME</li>
+            <li>APP_VERSION: $APP_VERSION</li>
+            <li>ENVIRONMENT: $ENVIRONMENT</li>
+            <li>DEBUG_MODE: $DEBUG_MODE</li>
+            <li>MAX_CONNECTIONS: $MAX_CONNECTIONS</li>
+            <li>TIMEOUT_SECONDS: $TIMEOUT_SECONDS</li>
+            <li>FEATURE_FLAG_A: $FEATURE_FLAG_A</li>
+            <li>FEATURE_FLAG_B: $FEATURE_FLAG_B</li>
+          </ul>
+        </body>
+        </html>
+        EOF
+
+        envsubst < /usr/share/nginx/html/index.html > /tmp/index.html
+        mv /tmp/index.html /usr/share/nginx/html/index.html
+
+        echo "Starting nginx with environment:"
+        echo "APP_NAME: $APP_NAME"
+        echo "ENVIRONMENT: $ENVIRONMENT"
+        echo "DEBUG_MODE: $DEBUG_MODE"
+
+        nginx -g "daemon off;"
+profiles:
+  compute:
+    app:
+      resources:
+        cpu:
+          units: 0.5
+        memory:
+          size: 512Mi
+        storage:
+          size: 1Gi
+  placement:
+    global:
+      attributes:
+        host: akash
+      pricing:
+        app:
+          denom: uakt
+          amount: 10000
+deployment:
+  app:
+    global:
+      profile: app
+      count: 1

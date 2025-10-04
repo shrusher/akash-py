@@ -1,0 +1,32 @@
+version: "2.0"
+services:
+  nginx:
+    image: nginx:alpine
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+profiles:
+  compute:
+    nginx:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    global:
+      attributes:
+        host: akash
+      pricing:
+        nginx:
+          denom: uakt
+          amount: 1000
+deployment:
+  nginx:
+    global:
+      profile: nginx
+      count: 1

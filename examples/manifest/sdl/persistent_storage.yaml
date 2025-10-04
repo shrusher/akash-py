@@ -1,0 +1,49 @@
+version: "2.0"
+services:
+  storage-test:
+    image: ubuntu:latest
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+    env:
+      - TEST_ENV=persistent-storage
+    command:
+      - "bash"
+      - "-c"
+    args:
+      - 'apt-get update && apt-get install -y nginx && echo "Persistent Storage Test" > /data/test.txt && nginx -g "daemon off;"'
+    params:
+      storage:
+        data:
+          mount: /data
+          readOnly: false
+profiles:
+  compute:
+    storage-test:
+      resources:
+        cpu:
+          units: 0.5
+        memory:
+          size: 512Mi
+        storage:
+          - size: 512Mi
+          - name: data
+            size: 1Gi
+            attributes:
+              persistent: true
+              class: beta3
+  placement:
+    global:
+      attributes:
+        host: akash
+      pricing:
+        storage-test:
+          denom: uakt
+          amount: 50000
+deployment:
+  storage-test:
+    global:
+      profile: storage-test
+      count: 1

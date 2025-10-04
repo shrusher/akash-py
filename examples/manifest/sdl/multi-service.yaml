@@ -1,0 +1,98 @@
+version: "2.0"
+services:
+  web:
+    image: nginx:alpine
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+    env:
+      - BACKEND_URL=http://api:3000
+  api:
+    image: node:alpine
+    expose:
+      - port: 3000
+        as: 3000
+        to:
+          - service: web
+    env:
+      - NODE_ENV=production
+      - API_VERSION=v1
+    command:
+      - "sh"
+      - "-c"
+    args:
+      - 'echo "const http = require(\"http\"); const server = http.createServer((req, res) => { res.writeHead(200); res.end(\"API Service v1 - OK\"); }); server.listen(3000);" > server.js && node server.js'
+  cache:
+    image: redis:alpine
+    expose:
+      - port: 6379
+        as: 6379
+        to:
+          - service: api
+    command:
+      - "redis-server"
+      - "--maxmemory"
+      - "64mb"
+profiles:
+  compute:
+    web:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+    api:
+      resources:
+        cpu:
+          units: 0.25
+        memory:
+          size: 256Mi
+        storage:
+          size: 512Mi
+    cache:
+      resources:
+        cpu:
+          units: 0.1
+        memory:
+          size: 128Mi
+        storage:
+          size: 512Mi
+  placement:
+    web-placement:
+      attributes:
+        host: akash
+      pricing:
+        web:
+          denom: uakt
+          amount: 10000
+    api-placement:
+      attributes:
+        host: akash
+      pricing:
+        api:
+          denom: uakt
+          amount: 10000
+    cache-placement:
+      attributes:
+        host: akash
+      pricing:
+        cache:
+          denom: uakt
+          amount: 10000
+deployment:
+  web:
+    web-placement:
+      profile: web
+      count: 1
+  api:
+    api-placement:
+      profile: api
+      count: 1
+  cache:
+    cache-placement:
+      profile: cache
+      count: 1

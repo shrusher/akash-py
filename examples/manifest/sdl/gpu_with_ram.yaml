@@ -1,0 +1,47 @@
+version: "2.0"
+services:
+  ml-workload:
+    image: nvidia/cuda:11.8.0-base-ubuntu22.04
+    expose:
+      - port: 8080
+        as: 80
+        to:
+          - global: true
+    env:
+      - CUDA_VISIBLE_DEVICES=0
+      - ML_TEST=enabled
+    command:
+      - "bash"
+      - "-c"
+    args:
+      - 'apt-get update && apt-get install -y nginx && (nvidia-smi || echo "GPU info not available") > /usr/share/nginx/html/index.html && echo "<br><br>GPU: A100 40GB requested" >> /usr/share/nginx/html/index.html && nginx -g "daemon off;"'
+profiles:
+  compute:
+    ml-workload:
+      resources:
+        cpu:
+          units: 2
+        memory:
+          size: 8Gi
+        gpu:
+          units: 1
+          attributes:
+            vendor:
+              nvidia:
+                - model: a100
+                  ram: 80Gi
+        storage:
+          - size: 10Gi
+  placement:
+    global:
+      attributes:
+        host: akash
+      pricing:
+        ml-workload:
+          denom: uakt
+          amount: 150000
+deployment:
+  ml-workload:
+    global:
+      profile: ml-workload
+      count: 1

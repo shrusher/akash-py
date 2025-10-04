@@ -1,0 +1,45 @@
+version: "2.0"
+services:
+  gpu-test:
+    image: nvidia/cuda:11.8.0-base-ubuntu22.04
+    expose:
+      - port: 80
+        as: 80
+        to:
+          - global: true
+    env:
+      - GPU_TEST=enabled
+    command:
+      - "bash"
+      - "-c"
+    args:
+      - 'apt-get update && apt-get install -y nginx && nvidia-smi > /usr/share/nginx/html/gpu-info.txt 2>&1 || echo "nvidia-smi not available" > /usr/share/nginx/html/gpu-info.txt && echo "<h1>GPU Test Deployment</h1><pre>$(cat /usr/share/nginx/html/gpu-info.txt)</pre>" > /usr/share/nginx/html/index.html && nginx -g "daemon off;"'
+profiles:
+  compute:
+    gpu-test:
+      resources:
+        cpu:
+          units: 1
+        memory:
+          size: 2Gi
+        gpu:
+          units: 1
+          attributes:
+            vendor:
+              nvidia:
+                - model: rtx4090
+        storage:
+          - size: 1Gi
+  placement:
+    global:
+      attributes:
+        host: akash
+      pricing:
+        gpu-test:
+          denom: uakt
+          amount: 10000
+deployment:
+  gpu-test:
+    global:
+      profile: gpu-test
+      count: 1
