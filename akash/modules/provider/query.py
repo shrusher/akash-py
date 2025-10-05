@@ -320,7 +320,8 @@ class ProviderQuery(MarketQuery):
         Get providers filtered by region attribute.
 
         Args:
-            region: Region to filter by (e.g., 'us-east', 'europe', 'asia')
+            region: Region to filter by (e.g., 'United States', 'Europe', 'Asia', 'East Coast')
+                   Performs case-insensitive substring matching
             include_status: Whether to include off-chain status for each provider
 
         Returns:
@@ -332,24 +333,30 @@ class ProviderQuery(MarketQuery):
             providers = self._get_all_providers()
             region_providers = []
 
+            region_lower = region.lower()
+
             for provider in providers:
                 if "attributes" in provider:
                     for attr in provider["attributes"]:
-                        if attr.get("key") == "region" and attr.get("value") == region:
-                            provider_info = provider.copy()
+                        key = attr.get("key", "")
+                        value = attr.get("value", "")
 
-                            if include_status:
-                                try:
-                                    status = self.get_provider_status(provider["owner"])
-                                    provider_info["status"] = status
-                                except Exception as e:
-                                    logger.warning(
-                                        f"Failed to get status for provider {provider['owner']}: {e}"
-                                    )
-                                    provider_info["status"] = None
+                        if key in ["location-region", "region", "country", "city"]:
+                            if region_lower in value.lower():
+                                provider_info = provider.copy()
 
-                            region_providers.append(provider_info)
-                            break
+                                if include_status:
+                                    try:
+                                        status = self.get_provider_status(provider["owner"])
+                                        provider_info["status"] = status
+                                    except Exception as e:
+                                        logger.warning(
+                                            f"Failed to get status for provider {provider['owner']}: {e}"
+                                        )
+                                        provider_info["status"] = None
+
+                                region_providers.append(provider_info)
+                                break
 
             logger.info(f"Found {len(region_providers)} providers in region {region}")
             return region_providers
@@ -365,8 +372,14 @@ class ProviderQuery(MarketQuery):
         """
         Get providers filtered by required capabilities.
 
+        Providers expose capabilities through attributes with keys like:
+        - "feat-persistent-storage", "feat-endpoint-ip", "feat-endpoint-custom-domain"
+        - "capabilities/storage/1/persistent", "capabilities/storage/1/class"
+
         Args:
-            capabilities: List of required capabilities (e.g., ['gpu', 'ssd', 'high-memory'])
+            capabilities: List of required capability keys or partial matches
+                         (e.g., ['feat-persistent-storage', 'feat-endpoint-ip'])
+                         Performs case-insensitive substring matching
             include_status: Whether to include off-chain status for each provider
 
         Returns:
@@ -378,6 +391,8 @@ class ProviderQuery(MarketQuery):
             providers = self._get_all_providers()
             capable_providers = []
 
+            capabilities_lower = [cap.lower() for cap in capabilities]
+
             for provider in providers:
                 if "attributes" in provider:
                     provider_capabilities = set()
@@ -386,19 +401,26 @@ class ProviderQuery(MarketQuery):
                         key = attr.get("key", "")
                         value = attr.get("value", "")
 
-                        if key in ["capabilities", "gpu", "storage", "compute"]:
-                            provider_capabilities.add(value.lower())
-                        elif key == "tier" and value in ["premium", "enterprise"]:
-                            provider_capabilities.add("high-performance")
-                        elif key == "gpu-vendor" and value:
-                            provider_capabilities.add("gpu")
+                        if key.startswith("feat-") and value.lower() == "true":
+                            provider_capabilities.add(key.lower())
 
-                    required_caps = set(cap.lower() for cap in capabilities)
-                    if required_caps.issubset(provider_capabilities):
+                        elif key.startswith("capabilities/") and value.lower() == "true":
+                            provider_capabilities.add(key.lower())
+
+                    has_all = True
+                    for required_cap in capabilities_lower:
+                        found = False
+                        for provider_cap in provider_capabilities:
+                            if required_cap in provider_cap or provider_cap in required_cap:
+                                found = True
+                                break
+                        if not found:
+                            has_all = False
+                            break
+
+                    if has_all:
                         provider_info = provider.copy()
-                        provider_info["matched_capabilities"] = list(
-                            provider_capabilities
-                        )
+                        provider_info["matched_capabilities"] = list(provider_capabilities)
 
                         if include_status:
                             try:
@@ -422,51 +444,3 @@ class ProviderQuery(MarketQuery):
             logger.error(error_msg)
             raise Exception(error_msg)
 
-    def get_providers_by_price_range(
-        self, max_price_per_hour: float, currency: str = "uakt"
-    ) -> List[Dict[str, Any]]:
-        """
-        Get providers filtered by maximum price per hour.
-
-        Args:
-            max_price_per_hour: Maximum acceptable price per hour
-            currency: Currency denomination (default: 'uakt')
-
-        Returns:
-            List of providers within the specified price range
-        """
-        try:
-            logger.info(
-                f"Getting providers with price <= {max_price_per_hour} {currency}/hour"
-            )
-
-            providers = self._get_all_providers()
-            affordable_providers = []
-
-            for provider in providers:
-                if "attributes" in provider:
-                    for attr in provider["attributes"]:
-                        if attr.get("key") == "pricing" or attr.get("key") == "price":
-                            try:
-                                price_str = attr.get("value", "0")
-                                price = float(price_str.replace(currency, "").strip())
-
-                                if price <= max_price_per_hour:
-                                    provider_info = provider.copy()
-                                    provider_info["hourly_price"] = price
-                                    provider_info["currency"] = currency
-                                    affordable_providers.append(provider_info)
-                                    break
-
-                            except (ValueError, AttributeError):
-                                continue
-
-            logger.info(
-                f"Found {len(affordable_providers)} providers within price range"
-            )
-            return affordable_providers
-
-        except Exception as e:
-            error_msg = f"Failed to get providers by price range: {e}"
-            logger.error(error_msg)
-            raise Exception(error_msg)

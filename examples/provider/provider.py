@@ -155,7 +155,7 @@ class ProviderE2ETests:
     def test_query_providers_by_attributes(self, client):
         """Test query providers by attributes."""
         try:
-            required_attrs = [{"key": "region", "value": "us-west"}]
+            required_attrs = [{"key": "host", "value": "akash"}]
             providers = client.provider.query_providers_by_attributes(required_attrs)
             if isinstance(providers, list):
                 return f"Found {len(providers)} providers with specified attributes"
@@ -170,7 +170,10 @@ class ProviderE2ETests:
                 "host_uri": "https://provider.test.com",
                 "email": "test@provider.com",
                 "website": "https://provider.com",
-                "attributes": [{"key": "region", "value": "us-west"}]
+                "attributes": [
+                    {"key": "location-region", "value": "West Coast"},
+                    {"key": "country", "value": "United States"}
+                ]
             }
             validation = client.provider.validate_provider_config(config)
             if isinstance(validation, dict) and "valid" in validation:
@@ -909,13 +912,13 @@ class ProviderE2ETests:
             results = {}
 
             try:
-                us_providers = client.provider.get_providers_by_region("us")
+                us_providers = client.provider.get_providers_by_region("United States")
                 results['us_region'] = len(us_providers) if isinstance(us_providers, list) else 0
             except Exception:
                 results['us_region'] = 0
 
             try:
-                eu_providers = client.provider.get_providers_by_region("eu")
+                eu_providers = client.provider.get_providers_by_region("Europe")
                 results['eu_region'] = len(eu_providers) if isinstance(eu_providers, list) else 0
             except Exception:
                 results['eu_region'] = 0
@@ -933,15 +936,8 @@ class ProviderE2ETests:
             except Exception:
                 results['persistent_storage'] = 0
 
-            try:
-                budget_providers = client.provider.get_providers_by_price_range(max_cpu_price_uakt=100,
-                                                                                max_memory_price_uakt=50)
-                results['budget_range'] = len(budget_providers) if isinstance(budget_providers, list) else 0
-            except Exception:
-                results['budget_range'] = 0
-
             total_results = sum(results.values())
-            return f"Convenience methods: US:{results['us_region']}, EU:{results['eu_region']}, GPU:{results['gpu_capable']}, Storage:{results['persistent_storage']}, Budget:{results['budget_range']} (total filtered: {total_results})"
+            return f"Convenience methods: US:{results['us_region']}, EU:{results['eu_region']}, GPU:{results['gpu_capable']}, Storage:{results['persistent_storage']} (total filtered: {total_results})"
 
         except Exception as e:
             return f"Convenience methods error: {str(e)[:100]}"
@@ -1006,7 +1002,8 @@ class ProviderE2ETests:
         website = f"https://akash-sdk-e2e-{int(time.time())}.test"
         
         attributes = [
-            {"key": "region", "value": "us-east"},
+            {"key": "location-region", "value": "East Coast"},
+            {"key": "country", "value": "United States"},
             {"key": "tier", "value": "community"},
             {"key": "organization", "value": "akash-sdk-test"}
         ]
@@ -1039,7 +1036,8 @@ class ProviderE2ETests:
         website = f"https://updated-akash-sdk-e2e-{int(time.time())}.test"
         
         attributes = [
-            {"key": "region", "value": "us-west"},
+            {"key": "location-region", "value": "West Coast"},
+            {"key": "country", "value": "United States"},
             {"key": "tier", "value": "community"},
             {"key": "updated", "value": "true"}
         ]

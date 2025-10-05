@@ -582,8 +582,7 @@ class TestProviderConvenienceMethods:
         """Test that all convenience methods exist."""
         expected_methods = [
             'get_providers_by_region',
-            'get_providers_by_capabilities',
-            'get_providers_by_price_range'
+            'get_providers_by_capabilities'
         ]
 
         for method_name in expected_methods:
@@ -665,20 +664,20 @@ class TestProviderConvenienceMethods:
             {
                 'owner': 'akash1provider1',
                 'attributes': [
-                    {'key': 'capabilities', 'value': 'gpu'},
-                    {'key': 'storage', 'value': 'ssd'}
+                    {'key': 'capabilities/gpu/vendor/nvidia', 'value': 'true'},
+                    {'key': 'feat-persistent-storage', 'value': 'true'}
                 ]
             },
             {
                 'owner': 'akash1provider2',
                 'attributes': [
-                    {'key': 'capabilities', 'value': 'standard'}
+                    {'key': 'feat-persistent-storage', 'value': 'true'}
                 ]
             },
             {
                 'owner': 'akash1provider3',
                 'attributes': [
-                    {'key': 'gpu-vendor', 'value': 'nvidia'}
+                    {'key': 'hardware-gpu', 'value': 'nvidia-rtx-4090'}
                 ]
             }
         ]
@@ -689,10 +688,8 @@ class TestProviderConvenienceMethods:
 
             result = self.client.get_providers_by_capabilities(['gpu'])
 
-            assert len(result) == 2
-            owners = {p['owner'] for p in result}
-            assert 'akash1provider1' in owners
-            assert 'akash1provider3' in owners
+            assert len(result) == 1
+            assert result[0]['owner'] == 'akash1provider1'
 
     def test_get_providers_by_capabilities_multiple(self):
         """Test filtering by multiple capabilities (requires all)."""
@@ -700,15 +697,15 @@ class TestProviderConvenienceMethods:
             {
                 'owner': 'akash1provider1',
                 'attributes': [
-                    {'key': 'gpu-vendor', 'value': 'nvidia'},
-                    {'key': 'storage', 'value': 'ssd'}
+                    {'key': 'capabilities/gpu/vendor/nvidia', 'value': 'true'},
+                    {'key': 'feat-persistent-storage', 'value': 'true'}
                 ]
             },
             {
                 'owner': 'akash1provider2',
                 'attributes': [
-                    {'key': 'capabilities', 'value': 'gpu'},
-                    {'key': 'storage', 'value': 'hdd'}
+                    {'key': 'capabilities/gpu/vendor/nvidia', 'value': 'true'},
+                    {'key': 'feat-endpoint-ip', 'value': 'true'}
                 ]
             }
         ]
@@ -717,31 +714,31 @@ class TestProviderConvenienceMethods:
         with patch.object(self.client, 'get_providers') as mock_list:
             mock_list.return_value = mock_providers
 
-            result = self.client.get_providers_by_capabilities(['gpu', 'ssd'])
+            result = self.client.get_providers_by_capabilities(['gpu', 'persistent-storage'])
 
             assert len(result) == 1
             assert result[0]['owner'] == 'akash1provider1'
             assert 'matched_capabilities' in result[0]
 
-    def test_get_providers_by_capabilities_tier_mapping(self):
-        """Test that premium/enterprise tier maps to high-performance capability."""
+    def test_get_providers_by_capabilities_partial_match(self):
+        """Test that partial capability matching works."""
         mock_providers = [
             {
                 'owner': 'akash1provider1',
                 'attributes': [
-                    {'key': 'tier', 'value': 'premium'}
+                    {'key': 'feat-persistent-storage', 'value': 'true'}
                 ]
             },
             {
                 'owner': 'akash1provider2',
                 'attributes': [
-                    {'key': 'tier', 'value': 'enterprise'}
+                    {'key': 'feat-endpoint-ip', 'value': 'true'}
                 ]
             },
             {
                 'owner': 'akash1provider3',
                 'attributes': [
-                    {'key': 'tier', 'value': 'basic'}
+                    {'key': 'feat-endpoint-custom-domain', 'value': 'true'}
                 ]
             }
         ]
@@ -750,93 +747,14 @@ class TestProviderConvenienceMethods:
         with patch.object(self.client, 'get_providers') as mock_list:
             mock_list.return_value = mock_providers
 
-            result = self.client.get_providers_by_capabilities(['high-performance'])
+            result = self.client.get_providers_by_capabilities(['endpoint'])
 
             assert len(result) == 2
             owners = {p['owner'] for p in result}
-            assert 'akash1provider1' in owners
             assert 'akash1provider2' in owners
-            assert 'akash1provider3' not in owners
+            assert 'akash1provider3' in owners
+            assert 'akash1provider1' not in owners
 
-    def test_get_providers_by_price_range_basic(self):
-        """Test basic price range filtering."""
-        mock_providers = [
-            {
-                'owner': 'akash1provider1',
-                'attributes': [
-                    {'key': 'pricing', 'value': '100uakt'}
-                ]
-            },
-            {
-                'owner': 'akash1provider2',
-                'attributes': [
-                    {'key': 'price', 'value': '200uakt'}
-                ]
-            },
-            {
-                'owner': 'akash1provider3',
-                'attributes': [
-                    {'key': 'pricing', 'value': '300uakt'}
-                ]
-            }
-        ]
-
-        from unittest.mock import patch
-        with patch.object(self.client, 'get_providers') as mock_list:
-            mock_list.return_value = mock_providers
-
-            result = self.client.get_providers_by_price_range(150.0)
-
-            assert len(result) == 1
-            assert result[0]['owner'] == 'akash1provider1'
-            assert result[0]['hourly_price'] == 100.0
-            assert result[0]['currency'] == 'uakt'
-
-    def test_get_providers_by_price_range_custom_currency(self):
-        """Test price filtering with custom currency."""
-        mock_providers = [
-            {
-                'owner': 'akash1provider1',
-                'attributes': [
-                    {'key': 'pricing', 'value': '50atom'}
-                ]
-            }
-        ]
-
-        from unittest.mock import patch
-        with patch.object(self.client, 'get_providers') as mock_list:
-            mock_list.return_value = mock_providers
-
-            result = self.client.get_providers_by_price_range(100.0, 'atom')
-
-            assert len(result) == 1
-            assert result[0]['hourly_price'] == 50.0
-            assert result[0]['currency'] == 'atom'
-
-    def test_get_providers_by_price_range_invalid_price(self):
-        """Test handling of invalid price data."""
-        mock_providers = [
-            {
-                'owner': 'akash1provider1',
-                'attributes': [
-                    {'key': 'pricing', 'value': 'invalid_price'}
-                ]
-            },
-            {
-                'owner': 'akash1provider2',
-                'attributes': [
-                    {'key': 'pricing', 'value': ''}
-                ]
-            }
-        ]
-
-        from unittest.mock import patch
-        with patch.object(self.client, 'get_providers') as mock_list:
-            mock_list.return_value = mock_providers
-
-            result = self.client.get_providers_by_price_range(100.0)
-
-            assert len(result) == 0
 
 
 class TestProviderGRPCClientIntegration:

@@ -128,7 +128,8 @@ class AuditE2ETests:
                 "owner": "akash1qnnhhgzxj24f2kld5yhy4v4h4s9r295ak5gjw4",
                 "auditor": "akash1xk9xgjdqp27v0lrgc3q4kj6pkxu44zx5qr2k6h",
                 "attributes": [
-                    {"key": "region", "value": "us-west"},
+                    {"key": "location-region", "value": "West Coast"},
+                    {"key": "country", "value": "United States"},
                     {"key": "tier", "value": "community"}
                 ]
             }
@@ -151,9 +152,9 @@ class AuditE2ETests:
             test_provider = "akash1qnnhhgzxj24f2kld5yhy4v4h4s9r295ak5gjw4"
 
         attributes = [
-            {"key": "region", "value": "us-west"},
+            {"key": "location-region", "value": "West Coast"},
+            {"key": "country", "value": "United States"},
             {"key": "tier", "value": "community"},
-            {"key": "uptime", "value": "99.9"},
             {"key": "e2e-test", "value": str(int(time.time()))}
         ]
 
@@ -187,7 +188,7 @@ class AuditE2ETests:
         except:
             test_provider = "akash1qnnhhgzxj24f2kld5yhy4v4h4s9r295ak5gjw4"
 
-        keys_to_delete = ["e2e-test", "uptime"]
+        keys_to_delete = ["e2e-test"]
 
         memo = ''
 
