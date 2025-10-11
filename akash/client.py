@@ -247,7 +247,7 @@ class AkashClient:
         """Get account balance - delegates to BankClient."""
         return self.bank.get_balance(address, denom)
 
-    def get_balances(self, address: str) -> Dict[str, str]:
+    def get_all_balances(self, address: str) -> Dict[str, str]:
         """Get all balances for an address - delegates to BankClient."""
         return self.bank.get_all_balances(address)
 
