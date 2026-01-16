@@ -1,5 +1,11 @@
 # Akash Python SDK
 
+> **Notice: This project is no longer actively maintained.**
+>
+> Due to insufficient community interest and adoption, this project has been archived and is no longer receiving updates or support. The codebase remains available for reference purposes, but we recommend exploring alternative solutions for production use.
+
+---
+
 Python SDK for interacting with the Akash blockchain and deploying workloads on the decentralized cloud
 marketplace.
 
