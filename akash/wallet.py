@@ -44,7 +44,7 @@ class AkashWallet:
     # BIP44 derivation path for Cosmos chains: m/44'/118'/0'/0/0
     COSMOS_DERIVATION_PATH = [44 + 0x80000000, 118 + 0x80000000, 0x80000000, 0, 0]
 
-    def __init__(self, private_key: SigningKey, mnemonic: Optional[str] = None):
+    def __init__(self, private_key: SigningKey, mnemonic: Optional[str] = None, chain_name: Optional[str] ='akash'):
         """
         Initialize wallet with a private key.
 
@@ -55,13 +55,13 @@ class AkashWallet:
         self._private_key = private_key
         self._public_key = private_key.verifying_key
         self._mnemonic = mnemonic
-        self._address = self._derive_address()
+        self._address = self._derive_address(chain_name=chain_name)
 
         logger.info(f"Initialized wallet with address: {self._address}")
 
     @classmethod
     def generate(
-        cls, strength: int = 128, passphrase: str = "", derivation_path: str = None
+        cls, strength: int = 128, passphrase: str = "", derivation_path: str = None, chain_name: Optional[str] ='akash'
     ) -> "AkashWallet":
         """
         Generate a new random wallet with proper BIP39 mnemonic.
@@ -104,12 +104,12 @@ class AkashWallet:
 
         logger.info(f"Generated new wallet with {len(mnemonic.split())} word mnemonic")
         return cls.from_mnemonic(
-            mnemonic, passphrase=passphrase, derivation_path=derivation_path
+            mnemonic, passphrase=passphrase, derivation_path=derivation_path, chain_name=chain_name
         )
 
     @classmethod
     def from_mnemonic(
-        cls, mnemonic: str, passphrase: str = "", derivation_path: str = None
+        cls, mnemonic: str, passphrase: str = "", derivation_path: str = None, chain_name: Optional[str] ='akash'
     ) -> "AkashWallet":
         """
         Create wallet from BIP39 mnemonic phrase using proper BIP44 derivation.
@@ -151,10 +151,10 @@ class AkashWallet:
         logger.info(
             f"Created wallet from mnemonic with derivation path: {derivation_path or 'default'}"
         )
-        return cls(private_key, mnemonic)
+        return cls(private_key=private_key, mnemonic=mnemonic, chain_name=chain_name)
 
     @classmethod
-    def from_private_key(cls, private_key) -> "AkashWallet":
+    def from_private_key(cls, private_key, chain_name: Optional[str] ='akash') -> "AkashWallet":
         """
         Create wallet from private key (bytes or hex string).
 
@@ -189,7 +189,7 @@ class AkashWallet:
 
         private_key_obj = SigningKey.from_string(private_key_bytes, curve=SECP256k1)
         logger.info("Created wallet from private key")
-        return cls(private_key_obj)
+        return cls(private_key_obj, chain_name=chain_name)
 
     @property
     def address(self) -> str:
@@ -211,7 +211,7 @@ class AkashWallet:
         """Get compressed public key bytes."""
         return self._public_key.to_string("compressed")
 
-    def _derive_address(self) -> str:
+    def _derive_address(self, chain_name: str) -> str:
         """
         Derive Akash address from public key.
 
@@ -235,7 +235,7 @@ class AkashWallet:
                 )
 
         converted_bits = bech32.convertbits(ripemd160_hash, 8, 5)
-        address = bech32.bech32_encode("akash", converted_bits)
+        address = bech32.bech32_encode(chain_name, converted_bits)
 
         return address
 

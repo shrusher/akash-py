@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from ...tx import BroadcastResult, broadcast_transaction_rpc
 
@@ -20,6 +20,8 @@ class EvidenceTx:
         gas_limit: int = 200000,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Submit evidence of validator misbehavior.
@@ -72,6 +74,8 @@ class EvidenceTx:
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
                 wait_for_confirmation=False,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:

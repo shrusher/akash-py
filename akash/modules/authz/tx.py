@@ -27,6 +27,8 @@ class AuthzTx:
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Grant authorization to another account with gas simulation.
@@ -105,6 +107,8 @@ class AuthzTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -128,6 +132,8 @@ class AuthzTx:
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Revoke authorization from another account with gas simulation.
@@ -168,6 +174,8 @@ class AuthzTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -190,6 +198,8 @@ class AuthzTx:
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Execute messages on behalf of another account (if authorized) with gas simulation.
@@ -230,6 +240,8 @@ class AuthzTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:

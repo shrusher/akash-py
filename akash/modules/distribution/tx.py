@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from ...tx import BroadcastResult, broadcast_transaction_rpc
 
@@ -19,6 +20,8 @@ class DistributionTx:
         gas_limit: int = 200000,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Withdraw rewards from a specific validator.
@@ -52,6 +55,8 @@ class DistributionTx:
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
                 wait_for_confirmation=False,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -67,6 +72,8 @@ class DistributionTx:
         gas_limit: int = 200000,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Withdraw validator commission.
@@ -99,6 +106,8 @@ class DistributionTx:
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
                 wait_for_confirmation=False,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -114,6 +123,8 @@ class DistributionTx:
         gas_limit: int = 200000,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Set the withdrawal address for rewards.
@@ -147,6 +158,8 @@ class DistributionTx:
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
                 wait_for_confirmation=False,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -163,6 +176,8 @@ class DistributionTx:
         gas_limit: int = 200000,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Fund the community pool with specified amount.
@@ -197,6 +212,8 @@ class DistributionTx:
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
                 wait_for_confirmation=False,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -211,6 +228,8 @@ class DistributionTx:
         gas_limit: int = 300000,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Withdraw all delegation rewards for a delegator.
@@ -261,6 +280,8 @@ class DistributionTx:
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
                 wait_for_confirmation=False,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:

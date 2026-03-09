@@ -25,6 +25,8 @@ class MarketTx:
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         try:
             from ...tx import broadcast_transaction_rpc, BroadcastResult
@@ -52,6 +54,8 @@ class MarketTx:
                 gas_limit=gas_limit,
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -73,6 +77,8 @@ class MarketTx:
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Close existing bid using unified broadcasting pattern.
@@ -119,6 +125,8 @@ class MarketTx:
                 gas_limit=gas_limit,
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -140,6 +148,8 @@ class MarketTx:
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Create lease from accepted bid using unified broadcasting pattern.
@@ -183,6 +193,8 @@ class MarketTx:
                 gas_limit=gas_limit,
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -204,6 +216,8 @@ class MarketTx:
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Close active lease using unified broadcasting pattern.
@@ -249,6 +263,8 @@ class MarketTx:
                 gas_limit=gas_limit,
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -270,6 +286,8 @@ class MarketTx:
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Withdraw funds from closed lease escrow using unified broadcasting pattern.
@@ -315,6 +333,8 @@ class MarketTx:
                 gas_limit=gas_limit,
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:

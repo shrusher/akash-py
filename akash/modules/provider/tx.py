@@ -23,6 +23,8 @@ class ProviderTx:
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Register a new provider on Akash Network.
@@ -67,6 +69,8 @@ class ProviderTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -85,6 +89,8 @@ class ProviderTx:
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Update existing provider information.
@@ -129,6 +135,8 @@ class ProviderTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:

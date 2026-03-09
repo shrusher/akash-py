@@ -26,6 +26,8 @@ class FeegrantTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Grant fee allowance to another account.
@@ -91,6 +93,8 @@ class FeegrantTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -108,6 +112,8 @@ class FeegrantTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Revoke fee allowance from another account.
@@ -144,6 +150,8 @@ class FeegrantTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:

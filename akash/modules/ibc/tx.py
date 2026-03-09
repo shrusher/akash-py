@@ -24,6 +24,8 @@ class IBCTx:
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Transfer tokens via IBC.
@@ -126,6 +128,8 @@ class IBCTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -145,6 +149,8 @@ class IBCTx:
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Create new IBC client for a target chain automatically.
@@ -367,6 +373,8 @@ class IBCTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
             if result.success:
@@ -457,6 +465,8 @@ class IBCTx:
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
         akash_api: str = "https://akash-api.polkachu.com",
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Update existing IBC client with latest block header.
@@ -626,6 +636,8 @@ class IBCTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
             if result.success:

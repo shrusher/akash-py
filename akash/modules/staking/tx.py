@@ -24,6 +24,8 @@ class StakingTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Delegate tokens to a validator with enhanced gas simulation.
@@ -62,6 +64,8 @@ class StakingTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -79,6 +83,8 @@ class StakingTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Undelegate tokens from a validator.
@@ -117,6 +123,8 @@ class StakingTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -135,6 +143,8 @@ class StakingTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Redelegate tokens from one validator to another.
@@ -177,6 +187,8 @@ class StakingTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -192,6 +204,8 @@ class StakingTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Withdraw delegation rewards from a validator.
@@ -227,6 +241,8 @@ class StakingTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -234,7 +250,13 @@ class StakingTx:
             return BroadcastResult("", 1, f"Reward withdrawal failed: {e}", False)
 
     def withdraw_all_rewards(
-        self, wallet, memo: str = "", fee_amount: str = None, gas_limit: int = None
+        self,
+        wallet,
+        memo: str = "",
+        fee_amount: str = None,
+        gas_limit: int = None,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Withdraw all delegation rewards from all validators.
@@ -282,6 +304,8 @@ class StakingTx:
                 use_simulation=False,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -296,6 +320,8 @@ class StakingTx:
         fee_amount: str = "5000",
         gas_limit: Optional[int] = None,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Create a new validator.
@@ -346,6 +372,8 @@ class StakingTx:
                 fee_amount=fee_amount,
                 gas_limit=gas_limit,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -363,6 +391,8 @@ class StakingTx:
         fee_amount: str = "5000",
         gas_limit: int = 200000,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Edit an existing validator.
@@ -432,6 +462,8 @@ class StakingTx:
                 fee_amount=fee_amount,
                 gas_limit=gas_limit,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:

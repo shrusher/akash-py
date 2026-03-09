@@ -484,6 +484,8 @@ def broadcast_transaction_rpc(
     use_simulation=True,
     wait_for_confirmation=True,
     confirmation_timeout=30,
+    payer="",
+    granter="",
 ):
     """
     Broadcast a transaction via RPC.
@@ -546,8 +548,8 @@ def broadcast_transaction_rpc(
                 "fee": {
                     "amount": [{"denom": "uakt", "amount": final_fee_amount}],
                     "gas_limit": str(final_gas_limit),
-                    "payer": "",
-                    "granter": "",
+                    "payer": payer,
+                    "granter": granter,
                 },
             },
             "signatures": [],
@@ -579,6 +581,8 @@ def broadcast_transaction_rpc(
             sign_bytes, hashfunc=hashlib.sha256, sigencode=sigencode_string_canonize
         )
         tx["signatures"] = [base64.b64encode(signature).decode()]
+
+        logger.debug(f"Transaction dict: {json.dumps(tx)}")
 
         from akash.proto.cosmos.tx.v1beta1.tx_pb2 import TxRaw
 
@@ -750,7 +754,11 @@ def encode_auth_info(auth_info):
             auth_info_pb.signer_infos.append(signer_info)
 
         fee_data = auth_info.get("fee", {})
-        fee = Fee(gas_limit=int(fee_data.get("gas_limit", "200000")))
+        fee = Fee(
+            gas_limit=int(fee_data.get("gas_limit", "200000")),
+            payer=fee_data.get("payer", ""),
+            granter=fee_data.get("granter", ""),
+        )
         for coin_data in fee_data.get("amount", []):
             coin = Coin(denom=coin_data["denom"], amount=coin_data["amount"])
             fee.amount.append(coin)

@@ -22,6 +22,8 @@ class BankTx:
         fee_amount: Optional[str] = None,
         gas_limit: Optional[int] = None,
         gas_adjustment: float = 1.2,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Send tokens with enhanced gas simulation.
@@ -61,6 +63,8 @@ class BankTx:
                 gas_adjustment=gas_adjustment,
                 use_simulation=(gas_limit is None),
                 wait_for_confirmation=True,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:

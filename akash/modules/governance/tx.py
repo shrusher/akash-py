@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 from ...tx import BroadcastResult, broadcast_transaction_rpc
 
@@ -23,6 +23,8 @@ class GovernanceTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Submit text proposal using unified broadcasting.
@@ -67,6 +69,8 @@ class GovernanceTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -86,6 +90,8 @@ class GovernanceTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Submit parameter change proposal using unified broadcasting.
@@ -139,6 +145,8 @@ class GovernanceTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -162,6 +170,8 @@ class GovernanceTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Submit software upgrade proposal using unified broadcasting.
@@ -214,6 +224,8 @@ class GovernanceTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -232,6 +244,8 @@ class GovernanceTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Vote on governance proposal.
@@ -279,6 +293,8 @@ class GovernanceTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -296,6 +312,8 @@ class GovernanceTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> "BroadcastResult":
         """
         Deposit tokens to governance proposal.
@@ -335,6 +353,8 @@ class GovernanceTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=15,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:

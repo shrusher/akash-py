@@ -19,6 +19,8 @@ class SlashingTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Unjail a validator that has been jailed for downtime.
@@ -64,6 +66,8 @@ class SlashingTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:

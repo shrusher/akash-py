@@ -18,15 +18,17 @@ class CertTx:
     """
 
     def publish_client_certificate(
-            self,
-            wallet,
-            cert_data: bytes,
-            public_key: bytes,
-            memo: str = "",
-            fee_amount: str = "20000",
-            gas_limit: int = None,
-            gas_adjustment: float = 1.2,
-            use_simulation: bool = True,
+        self,
+        wallet,
+        cert_data: bytes,
+        public_key: bytes,
+        memo: str = "",
+        fee_amount: str = "20000",
+        gas_limit: int = None,
+        gas_adjustment: float = 1.2,
+        use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Publish a client certificate to the blockchain.
@@ -70,6 +72,8 @@ class CertTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -79,12 +83,14 @@ class CertTx:
             )
 
     def create_certificate(
-            self,
-            wallet,
-            memo: str = "",
-            fee_amount: str = "20000",
-            gas_limit: int = None,
-            use_simulation: bool = True,
+        self,
+        wallet,
+        memo: str = "",
+        fee_amount: str = "20000",
+        gas_limit: int = None,
+        use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Create and publish a client certificate for mTLS authentication.
@@ -209,6 +215,8 @@ class CertTx:
                 fee_amount=fee_amount,
                 gas_limit=gas_limit,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
             if result.success:
@@ -228,15 +236,17 @@ class CertTx:
             return BroadcastResult("", 1, f"Failed to create certificate: {e}", False)
 
     def publish_server_certificate(
-            self,
-            wallet,
-            cert_data: bytes,
-            public_key: bytes,
-            memo: str = "",
-            fee_amount: str = "20000",
-            gas_limit: int = None,
-            gas_adjustment: float = 1.2,
-            use_simulation: bool = True,
+        self,
+        wallet,
+        cert_data: bytes,
+        public_key: bytes,
+        memo: str = "",
+        fee_amount: str = "20000",
+        gas_limit: int = None,
+        gas_adjustment: float = 1.2,
+        use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Publish a server certificate to the blockchain.
@@ -275,6 +285,8 @@ class CertTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -284,14 +296,16 @@ class CertTx:
             )
 
     def revoke_client_certificate(
-            self,
-            wallet,
-            serial: str,
-            memo: str = "",
-            fee_amount: str = "20000",
-            gas_limit: int = None,
-            gas_adjustment: float = 1.2,
-            use_simulation: bool = True,
+        self,
+        wallet,
+        serial: str,
+        memo: str = "",
+        fee_amount: str = "20000",
+        gas_limit: int = None,
+        gas_adjustment: float = 1.2,
+        use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Revoke a client certificate.
@@ -327,6 +341,8 @@ class CertTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -336,14 +352,16 @@ class CertTx:
             )
 
     def revoke_server_certificate(
-            self,
-            wallet,
-            serial: str,
-            memo: str = "",
-            fee_amount: str = "20000",
-            gas_limit: int = None,
-            gas_adjustment: float = 1.2,
-            use_simulation: bool = True,
+        self,
+        wallet,
+        serial: str,
+        memo: str = "",
+        fee_amount: str = "20000",
+        gas_limit: int = None,
+        gas_adjustment: float = 1.2,
+        use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Revoke a server certificate.
@@ -379,6 +397,8 @@ class CertTx:
                 use_simulation=use_simulation,
                 wait_for_confirmation=True,
                 confirmation_timeout=30,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:

@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 from ...tx import BroadcastResult, broadcast_transaction_rpc
 
@@ -24,6 +24,8 @@ class DeploymentTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Create deployment from SDL YAML.
@@ -90,6 +92,8 @@ class DeploymentTx:
                 gas_limit=gas_limit,
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
             if result.success:
@@ -113,6 +117,8 @@ class DeploymentTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Update deployment with SDL YAML content.
@@ -177,6 +183,8 @@ class DeploymentTx:
                 gas_limit=gas_limit,
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -193,6 +201,8 @@ class DeploymentTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Close deployment.
@@ -224,6 +234,8 @@ class DeploymentTx:
                 gas_limit=gas_limit,
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -242,6 +254,8 @@ class DeploymentTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Add funds to deployment deposit account.
@@ -277,6 +291,8 @@ class DeploymentTx:
                 gas_limit=gas_limit,
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -294,6 +310,8 @@ class DeploymentTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Close a specific group within a deployment.
@@ -326,6 +344,8 @@ class DeploymentTx:
                 gas_limit=gas_limit,
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -343,6 +363,8 @@ class DeploymentTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Pause a specific group within a deployment.
@@ -375,6 +397,8 @@ class DeploymentTx:
                 gas_limit=gas_limit,
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
@@ -392,6 +416,8 @@ class DeploymentTx:
         gas_limit: int = None,
         gas_adjustment: float = 1.2,
         use_simulation: bool = True,
+        payer: Optional[str] = "",
+        granter: Optional[str] = "",
     ) -> BroadcastResult:
         """
         Start a specific group within a deployment.
@@ -424,6 +450,8 @@ class DeploymentTx:
                 gas_limit=gas_limit,
                 gas_adjustment=gas_adjustment,
                 use_simulation=use_simulation,
+                payer=payer,
+                granter=granter,
             )
 
         except Exception as e:
